@@ -1,682 +1,577 @@
-// ============================================
-//  Chat Summarizer – SillyTavern Extension
-// ============================================
-const CS_MODULE = 'chat_summarizer';
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;600&family=Press+Start+2P&display=swap');
 
-const CS_THEMES = {
-  cyber:   '🌆 사이버펑크',
-  retro:   '🖥️ 레트로 Y2K',
-  romance: '🏰 로맨스 판타지',
-  magical: '⭐ 마법소녀',
-  simple:  '⬜ 심플',
-};
+/* ── CSS 변수 (테마별) ───────────────────────── */
 
-const CS_DEFAULT_PROMPT = `You are a structured story summarizer. Analyze the conversation between {{user}} and {{char}}, then produce a YAML summary inside <summary> tags.
-
-Rules:
-- Write in Korean.
-- Only include NEW or UPDATED information not already covered in previous summaries.
-- Use concise, factual sentences.
-- Timeline entries must be in chronological order with timestamps or event markers.
-- Do not repeat information across sections.
-- If a section has no new content, write "변동 없음".
-
-<summary>
-Main_Characters:
-  - Name: {{char}}
-    Appearance: (physical description)
-    Personality: (key traits)
-    Status: (current state/mood)
-    Notes: (any new developments)
-  - Name: {{user}}
-    Appearance: (physical description)
-    Personality: (key traits)
-    Status: (current state/mood)
-    Notes: (any new developments)
-
-Minor_Characters:
-  - Name: (NPC name)
-    Role: (role in story)
-    Notes: (relevant info)
-
-Timeline:
-  - Event: (what happened)
-    When: (time marker)
-    Who: (involved characters)
-    Details: (brief description)
-
-Locations:
-  - Name: (place name)
-    Description: (what it looks like)
-    Notes: (any significance)
-
-Lore:
-  - Topic: (lore topic)
-    Details: (explanation)
-</summary>`;
-
-const CS_DEFAULTS = {
-  profileId: '',
-  warnEnabled: true,
-  warnThreshold: 85,
-  promptTemplate: CS_DEFAULT_PROMPT,
-  theme: 'cyber',
-};
-
-/* ── Settings ── */
-function getCsSettings() {
-  const ctx = SillyTavern.getContext();
-  if (!ctx.extensionSettings[CS_MODULE]) {
-    ctx.extensionSettings[CS_MODULE] = structuredClone(CS_DEFAULTS);
-  }
-  const s = ctx.extensionSettings[CS_MODULE];
-  for (const [k, v] of Object.entries(CS_DEFAULTS)) {
-    if (s[k] === undefined) s[k] = v;
-  }
-  return s;
+/* 사이버펑크 (기본) */
+.cs-overlay[data-theme="cyber"] {
+    --cs-bg: #1a1a2e;
+    --cs-header-bg: #16162a;
+    --cs-card-bg: #222244;
+    --cs-border: #333;
+    --cs-text: #e0e0e0;
+    --cs-text-sub: #aaa;
+    --cs-text-dim: #666;
+    --cs-accent: #a855f7;
+    --cs-accent-gradient: linear-gradient(135deg, #6c5ce7, #a855f7);
+    --cs-accent-light: rgba(168, 85, 247, 0.2);
+    --cs-accent-border: rgba(168, 85, 247, 0.4);
+    --cs-accent-text: #c4b5fd;
+    --cs-input-bg: #222244;
+    --cs-input-border: #444;
+    --cs-input-focus: #6c5ce7;
+    --cs-btn-secondary-bg: rgba(255,255,255,0.08);
+    --cs-btn-secondary-border: #555;
+    --cs-btn-secondary-text: #ccc;
+    --cs-success: #4ade80;
+    --cs-warning-bg: rgba(239, 68, 68, 0.15);
+    --cs-warning-border: rgba(239, 68, 68, 0.4);
+    --cs-warning-text: #fca5a5;
+    --cs-error: #f87171;
+    --cs-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    --cs-radius: 12px;
+    --cs-font: 'Noto Sans KR', sans-serif;
+    --cs-font-mono: 'Noto Sans KR', monospace;
+    --cs-close-bg: rgba(255,255,255,0.1);
+    --cs-close-border: #555;
+    --cs-close-text: #ccc;
+    --cs-meter-track: #333;
+    --cs-copy-hover: rgba(168, 85, 247, 0.3);
+    --cs-section-hover: #252550;
+    --cs-textarea-bg: #1a1a2e;
 }
 
-/* ── Context Info ── */
-function getContextInfo() {
-  const ctx = SillyTavern.getContext();
-
-  // Read real max context
-  const openaiCtxEl = document.getElementById('openai_max_context');
-  const textgenCtxEl = document.getElementById('max_context');
-  let maxCtx = 0;
-  if (ctx.mainApi === 'openai' && openaiCtxEl) {
-    maxCtx = parseInt(openaiCtxEl.value) || 0;
-  }
-  if (!maxCtx && textgenCtxEl) {
-    maxCtx = parseInt(textgenCtxEl.value) || 0;
-  }
-  if (!maxCtx) maxCtx = ctx.maxContext || 8192;
-
-  // Reserved response tokens
-  const maxTokensEl = document.getElementById('openai_max_tokens');
-  const reservedTokens = maxTokensEl ? (parseInt(maxTokensEl.value) || 0) : 0;
-  const available = Math.max(0, maxCtx - reservedTokens);
-
-  // Calculate chat tokens
-  const chat = ctx.chat || [];
-  let totalTokens = 0;
-  const perMsg = [];
-  for (const msg of chat) {
-    const text = msg.mes || '';
-    const t = ctx.getTokenCount(text);
-    totalTokens += t;
-    perMsg.push(t);
-  }
-
-  const usagePercent = available > 0 ? Math.round((totalTokens / available) * 100) : 0;
-
-  return { maxCtx, reservedTokens, available, totalTokens, usagePercent, msgCount: chat.length, perMsg };
+/* 레트로 PC */
+.cs-overlay[data-theme="retro"] {
+    --cs-bg: #c0c0c0;
+    --cs-header-bg: linear-gradient(90deg, #000080, #1084d0);
+    --cs-card-bg: #fff;
+    --cs-border: #808080;
+    --cs-text: #000;
+    --cs-text-sub: #444;
+    --cs-text-dim: #808080;
+    --cs-accent: #000080;
+    --cs-accent-gradient: linear-gradient(180deg, #dfdfdf, #c0c0c0);
+    --cs-accent-light: rgba(0, 0, 128, 0.1);
+    --cs-accent-border: #808080;
+    --cs-accent-text: #000080;
+    --cs-input-bg: #fff;
+    --cs-input-border: #808080;
+    --cs-input-focus: #000080;
+    --cs-btn-secondary-bg: #dfdfdf;
+    --cs-btn-secondary-border: #808080;
+    --cs-btn-secondary-text: #000;
+    --cs-success: #008000;
+    --cs-warning-bg: rgba(255, 255, 0, 0.3);
+    --cs-warning-border: #808000;
+    --cs-warning-text: #804000;
+    --cs-error: #ff0000;
+    --cs-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
+    --cs-radius: 0px;
+    --cs-font: 'Press Start 2P', 'Noto Sans KR', monospace;
+    --cs-font-mono: 'Press Start 2P', monospace;
+    --cs-close-bg: #c0c0c0;
+    --cs-close-border: #808080;
+    --cs-close-text: #000;
+    --cs-meter-track: #808080;
+    --cs-copy-hover: rgba(0, 0, 128, 0.2);
+    --cs-section-hover: #e8e8e8;
+    --cs-textarea-bg: #fff;
 }
 
-/* ── Profiles ── */
-function getAvailableProfiles() {
-  try {
-    const ctx = SillyTavern.getContext();
-    const CMRS = ctx.ConnectionManagerRequestService;
-    if (CMRS && typeof CMRS.getSupportedProfiles === 'function') {
-      return CMRS.getSupportedProfiles() || [];
-    }
-  } catch (e) { console.warn('[CS] profile error:', e); }
-  return [];
+/* 로판 */
+.cs-overlay[data-theme="romance"] {
+    --cs-bg: #fdf6ee;
+    --cs-header-bg: linear-gradient(135deg, #f5e6d3, #eedcc8);
+    --cs-card-bg: #fff;
+    --cs-border: #e0d0bc;
+    --cs-text: #4a3728;
+    --cs-text-sub: #8a7560;
+    --cs-text-dim: #bba88e;
+    --cs-accent: #c08b5c;
+    --cs-accent-gradient: linear-gradient(135deg, #d4a574, #c08b5c);
+    --cs-accent-light: rgba(192, 139, 92, 0.12);
+    --cs-accent-border: rgba(192, 139, 92, 0.35);
+    --cs-accent-text: #a06830;
+    --cs-input-bg: #fefcf9;
+    --cs-input-border: #e0d0bc;
+    --cs-input-focus: #c08b5c;
+    --cs-btn-secondary-bg: #f5ede4;
+    --cs-btn-secondary-border: #e0d0bc;
+    --cs-btn-secondary-text: #6b5540;
+    --cs-success: #7a9e6e;
+    --cs-warning-bg: rgba(200, 120, 80, 0.12);
+    --cs-warning-border: rgba(200, 120, 80, 0.35);
+    --cs-warning-text: #a05530;
+    --cs-error: #c05050;
+    --cs-shadow: 0 4px 20px rgba(120, 80, 40, 0.1);
+    --cs-radius: 14px;
+    --cs-font: 'Noto Serif KR', serif;
+    --cs-font-mono: 'Noto Serif KR', serif;
+    --cs-close-bg: #f5ede4;
+    --cs-close-border: #e0d0bc;
+    --cs-close-text: #6b5540;
+    --cs-meter-track: #e8ddd0;
+    --cs-copy-hover: rgba(192, 139, 92, 0.2);
+    --cs-section-hover: #faf4ec;
+    --cs-textarea-bg: #fefcf9;
 }
 
-/* ── Build Prompt ── */
-function buildSummaryPrompt(settings) {
-  const ctx = SillyTavern.getContext();
-  let prompt = settings.promptTemplate || CS_DEFAULT_PROMPT;
-  prompt = prompt.replace(/\{\{user\}\}/g, ctx.name1 || 'User');
-  prompt = prompt.replace(/\{\{char\}\}/g, ctx.name2 || 'Character');
-  return prompt;
+/* 마법소녀 */
+.cs-overlay[data-theme="magical"] {
+    --cs-bg: #fef0f8;
+    --cs-header-bg: linear-gradient(135deg, #fdb4d8, #c9a5f7);
+    --cs-card-bg: #fff;
+    --cs-border: #f0d0e8;
+    --cs-text: #5a3060;
+    --cs-text-sub: #9070a0;
+    --cs-text-dim: #c0a0c8;
+    --cs-accent: #e060a0;
+    --cs-accent-gradient: linear-gradient(135deg, #f472b6, #c084fc);
+    --cs-accent-light: rgba(244, 114, 182, 0.15);
+    --cs-accent-border: rgba(244, 114, 182, 0.4);
+    --cs-accent-text: #d946a8;
+    --cs-input-bg: #fff8fc;
+    --cs-input-border: #f0d0e8;
+    --cs-input-focus: #e060a0;
+    --cs-btn-secondary-bg: #fce8f4;
+    --cs-btn-secondary-border: #f0d0e8;
+    --cs-btn-secondary-text: #805070;
+    --cs-success: #60c090;
+    --cs-warning-bg: rgba(250, 180, 80, 0.15);
+    --cs-warning-border: rgba(250, 180, 80, 0.4);
+    --cs-warning-text: #c07030;
+    --cs-error: #e04070;
+    --cs-shadow: 0 6px 24px rgba(200, 100, 180, 0.15);
+    --cs-radius: 16px;
+    --cs-font: 'Noto Sans KR', sans-serif;
+    --cs-font-mono: 'Noto Sans KR', monospace;
+    --cs-close-bg: #fce8f4;
+    --cs-close-border: #f0d0e8;
+    --cs-close-text: #805070;
+    --cs-meter-track: #f0d8e8;
+    --cs-copy-hover: rgba(244, 114, 182, 0.25);
+    --cs-section-hover: #fff4fa;
+    --cs-textarea-bg: #fff8fc;
 }
 
-/* ── Parse Result ── */
-function parseSummaryResult(text) {
-  const match = text.match(/<summary>([\s\S]*?)<\/summary>/i);
-  const raw = match ? match[1].trim() : text.trim();
-
-  const sections = {};
-  const sectionNames = ['Main_Characters', 'Minor_Characters', 'Timeline', 'Locations', 'Lore'];
-
-  for (let i = 0; i < sectionNames.length; i++) {
-    const name = sectionNames[i];
-    const nextName = sectionNames[i + 1];
-    let regex;
-    if (nextName) {
-      regex = new RegExp(`${name}:\\s*\\n([\\s\\S]*?)(?=\\n${nextName}:)`, 'i');
-    } else {
-      regex = new RegExp(`${name}:\\s*\\n([\\s\\S]*)`, 'i');
-    }
-    const m = raw.match(regex);
-    sections[name] = m ? m[1].trim() : '';
-  }
-
-  return { raw, sections };
+/* 심플 */
+.cs-overlay[data-theme="simple"] {
+    --cs-bg: #ffffff;
+    --cs-header-bg: #fafafa;
+    --cs-card-bg: #f8f8f8;
+    --cs-border: #e0e0e0;
+    --cs-text: #1a1a1a;
+    --cs-text-sub: #888;
+    --cs-text-dim: #bbb;
+    --cs-accent: #333;
+    --cs-accent-gradient: linear-gradient(135deg, #444, #222);
+    --cs-accent-light: rgba(0, 0, 0, 0.05);
+    --cs-accent-border: rgba(0, 0, 0, 0.15);
+    --cs-accent-text: #333;
+    --cs-input-bg: #fff;
+    --cs-input-border: #ddd;
+    --cs-input-focus: #333;
+    --cs-btn-secondary-bg: #f0f0f0;
+    --cs-btn-secondary-border: #ddd;
+    --cs-btn-secondary-text: #444;
+    --cs-success: #22c55e;
+    --cs-warning-bg: rgba(250, 180, 50, 0.1);
+    --cs-warning-border: rgba(250, 180, 50, 0.3);
+    --cs-warning-text: #92600a;
+    --cs-error: #dc2626;
+    --cs-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    --cs-radius: 10px;
+    --cs-font: 'Noto Sans KR', sans-serif;
+    --cs-font-mono: 'Noto Sans KR', monospace;
+    --cs-close-bg: #f0f0f0;
+    --cs-close-border: #ddd;
+    --cs-close-text: #444;
+    --cs-meter-track: #e8e8e8;
+    --cs-copy-hover: rgba(0, 0, 0, 0.08);
+    --cs-section-hover: #f4f4f4;
+    --cs-textarea-bg: #fff;
 }
 
-/* ── Helpers ── */
-function escapeHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+/* ── 오버레이 ────────────────────────────────── */
+.cs-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0,0,0,0.6);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
 }
 
-async function copyToClipboard(text, btn) {
-  try {
-    await navigator.clipboard.writeText(text);
-    const orig = btn.textContent;
-    btn.textContent = '✓ 복사됨';
-    setTimeout(() => btn.textContent = orig, 1500);
-  } catch (e) {
-    console.error('[CS] copy failed:', e);
-  }
+/* ── 팝업 ────────────────────────────────────── */
+.cs-popup {
+    position: relative;
+    width: 92vw;
+    max-width: 600px;
+    height: 85vh;
+    background: var(--cs-bg);
+    border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius);
+    box-shadow: var(--cs-shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: var(--cs-font);
+    color: var(--cs-text);
 }
 
-/* ── Context Warning ── */
-function showContextWarning(info) {
-  if (document.querySelector('.cs-alert-overlay')) return;
-  const settings = getCsSettings();
+/* ── 헤더 ────────────────────────────────────── */
+.cs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 18px;
+    background: var(--cs-header-bg);
+    border-bottom: 1px solid var(--cs-border);
+    flex-shrink: 0;
+}
+.cs-header-title {
+    font-size: 15px;
+    font-weight: 700;
+}
+/* 레트로 헤더 흰색 텍스트 */
+[data-theme="retro"] .cs-header-title { color: #fff; font-size: 12px; }
+[data-theme="retro"] .cs-close-btn { font-family: 'Noto Sans KR', sans-serif; }
+/* 마법소녀 헤더 */
+[data-theme="magical"] .cs-header-title { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.2); }
 
-  const alertOverlay = document.createElement('div');
-  alertOverlay.className = 'cs-alert-overlay';
+.cs-close-btn {
+    background: var(--cs-close-bg);
+    border: 1px solid var(--cs-close-border);
+    color: var(--cs-close-text);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--cs-font);
+}
+.cs-close-btn:hover { opacity: 0.8; }
 
-  const alertBox = document.createElement('div');
-  alertBox.className = 'cs-alert-box';
-  alertBox.innerHTML = `
-    <div class="cs-alert-icon">⚠️</div>
-    <div class="cs-alert-title">컨텍스트 경고</div>
-    <div class="cs-alert-msg">
-      현재 사용량이 <b>${info.usagePercent}%</b>입니다.<br>
-      (${info.totalTokens.toLocaleString()} / ${info.available.toLocaleString()} 토큰)<br><br>
-      다음 응답부터 이전 메시지가 잘릴 수 있습니다.<br>
-      요약을 권장합니다!
-    </div>
-    <button class="cs-alert-btn">확인</button>
-  `;
-  alertOverlay.appendChild(alertBox);
-
-  alertBox.querySelector('.cs-alert-btn').addEventListener('click', () => alertOverlay.remove());
-  alertOverlay.addEventListener('click', (e) => { if (e.target === alertOverlay) alertOverlay.remove(); });
-
-  document.body.appendChild(alertOverlay);
+/* 레트로 버튼 스타일 오버라이드 */
+[data-theme="retro"] .cs-popup {
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff, 2px 2px 0 #000;
+}
+[data-theme="retro"] .cs-close-btn {
+    border-radius: 0;
+    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
+}
+[data-theme="retro"] .cs-close-btn:active {
+    box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff;
 }
 
-/* ── Check Context on new messages ── */
-function checkContextWarning() {
-  const settings = getCsSettings();
-  if (!settings.warnEnabled) return;
-  const info = getContextInfo();
-  if (info.usagePercent >= settings.warnThreshold) {
-    showContextWarning(info);
-  }
+/* ── 컨텐츠 ──────────────────────────────────── */
+.cs-content {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    min-height: 0;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
 }
 
-/* ══════════════════════════════════
-   MAIN POPUP
-   ══════════════════════════════════ */
-function showSummarizerPopup() {
-  // If popup already exists, just show it
-  const existing = document.querySelector('.cs-overlay');
-  if (existing) {
-    existing.style.display = 'flex';
-    return;
-  }
+/* ── 컨텍스트 미터 ───────────────────────────── */
+.cs-context-meter {
+    background: var(--cs-card-bg);
+    border-radius: var(--cs-radius);
+    padding: 14px;
+    border: 1px solid var(--cs-border);
+}
+.cs-meter-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+.cs-meter-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
+.cs-meter-value { font-size: 12px; font-weight: 700; color: var(--cs-text); }
+.cs-meter-bar {
+    width: 100%;
+    height: 8px;
+    background: var(--cs-meter-track);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.cs-meter-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.cs-meter-fill.safe { background: linear-gradient(90deg, #4ade80, #22c55e); }
+.cs-meter-fill.warning { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
+.cs-meter-fill.danger { background: linear-gradient(90deg, #f87171, #ef4444); }
+.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--cs-text-dim); }
 
-  const settings = getCsSettings();
-  const profiles = getAvailableProfiles();
-  const info = getContextInfo();
+/* 레트로 미터 */
+[data-theme="retro"] .cs-meter-bar { border-radius: 0; border: 1px inset #808080; }
+[data-theme="retro"] .cs-meter-fill { border-radius: 0; }
 
-  // Create overlay
-  const overlay = document.createElement('div');
-  overlay.className = 'cs-overlay';
-  overlay.setAttribute('data-theme', settings.theme || 'cyber');
+/* ── 경고 배너 ───────────────────────────────── */
+.cs-warning-banner {
+    background: var(--cs-warning-bg);
+    border: 1px solid var(--cs-warning-border);
+    border-radius: var(--cs-radius);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--cs-warning-text);
+}
+.cs-warning-icon { font-size: 18px; flex-shrink: 0; }
 
-  const popup = document.createElement('div');
-  popup.className = 'cs-popup';
+/* ── 프로필/프롬프트 섹션 ────────────────────── */
+.cs-profile-section, .cs-prompt-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.cs-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
+.cs-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--cs-input-border);
+    border-radius: var(--cs-radius);
+    background: var(--cs-input-bg);
+    font-family: var(--cs-font);
+    font-size: 13px;
+    color: var(--cs-text);
+    cursor: pointer;
+}
+[data-theme="retro"] .cs-select { border-radius: 0; font-family: 'Noto Sans KR', sans-serif; font-size: 12px; }
 
-  // Header
-  const header = document.createElement('div');
-  header.className = 'cs-header';
-  header.innerHTML = `<span class="cs-header-title">📝 채팅 요약</span>`;
+.cs-prompt-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+}
+.cs-prompt-toggle-icon { font-size: 11px; color: var(--cs-text-dim); transition: transform 0.2s; }
+.cs-prompt-toggle-icon.open { transform: rotate(90deg); }
 
-  const closeBtn = document.createElement('button');
-  closeBtn.className = 'cs-close-btn';
-  closeBtn.textContent = '✕';
-  closeBtn.addEventListener('click', () => {
-    overlay.style.display = 'none';
-  });
-  header.appendChild(closeBtn);
+.cs-textarea {
+    width: 100%;
+    min-height: 200px;
+    border: 1px solid var(--cs-input-border);
+    border-radius: var(--cs-radius);
+    background: var(--cs-input-bg);
+    font-family: var(--cs-font-mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--cs-text);
+    padding: 12px;
+    resize: vertical;
+    box-sizing: border-box;
+}
+.cs-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
+[data-theme="retro"] .cs-textarea { border-radius: 0; font-family: 'Noto Sans KR', monospace; }
 
-  // Content
-  const content = document.createElement('div');
-  content.className = 'cs-content';
+/* ── 생성 버튼 ───────────────────────────────── */
+.cs-generate-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--cs-accent-gradient);
+    color: #fff;
+    border: none;
+    border-radius: var(--cs-radius);
+    font-family: var(--cs-font);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.cs-generate-btn:hover { opacity: 0.9; }
+.cs-generate-btn:active { transform: scale(0.98); }
+.cs-generate-btn:disabled { background: #555; cursor: not-allowed; }
 
-  popup.appendChild(header);
-  popup.appendChild(content);
-  overlay.appendChild(popup);
-
-  // Click outside to hide
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) overlay.style.display = 'none';
-  });
-
-  // Escape key to hide
-  const escHandler = (e) => {
-    if (e.key === 'Escape' && overlay.style.display !== 'none') {
-      overlay.style.display = 'none';
-    }
-  };
-  document.addEventListener('keydown', escHandler);
-
-  document.body.appendChild(overlay);
-
-  // Show the main view (NOT generate immediately!)
-  showMainView(content, settings, profiles, info, overlay);
+[data-theme="retro"] .cs-generate-btn {
+    border-radius: 0;
+    background: #c0c0c0;
+    color: #000;
+    border: 2px outset #dfdfdf;
+    font-family: 'Noto Sans KR', sans-serif;
+}
+[data-theme="retro"] .cs-generate-btn:active {
+    border-style: inset;
 }
 
-/* ── Main View (before generation) ── */
-function showMainView(content, settings, profiles, info, overlay) {
-  // Meter color
-  let meterColor = 'var(--cs-meter-ok)';
-  let meterLabel = '여유';
-  if (info.usagePercent >= 85) {
-    meterColor = 'var(--cs-meter-danger)';
-    meterLabel = '위험';
-  } else if (info.usagePercent >= 60) {
-    meterColor = 'var(--cs-meter-warn)';
-    meterLabel = '주의';
-  }
+/* ── 로딩 ────────────────────────────────────── */
+.cs-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 40px 20px;
+    color: var(--cs-text-sub);
+    font-size: 14px;
+}
+.cs-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--cs-border);
+    border-top-color: var(--cs-accent);
+    border-radius: 50%;
+    animation: cs-spin 0.8s linear infinite;
+}
+@keyframes cs-spin { to { transform: rotate(360deg); } }
+[data-theme="retro"] .cs-spinner { border-radius: 0; }
+[data-theme="retro"] .cs-loading { font-family: 'Noto Sans KR', sans-serif; }
 
-  let html = '';
+/* ── 결과 섹션 ───────────────────────────────── */
+.cs-result-section {
+    background: var(--cs-card-bg);
+    border: 1px solid var(--cs-border);
+    border-radius: var(--cs-radius);
+    overflow: hidden;
+}
+.cs-result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    cursor: pointer;
+    user-select: none;
+}
+.cs-result-header:hover { background: var(--cs-section-hover); }
+.cs-result-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cs-accent-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.cs-result-actions { display: flex; gap: 6px; }
+.cs-copy-btn {
+    padding: 4px 10px;
+    background: var(--cs-accent-light);
+    border: 1px solid var(--cs-accent-border);
+    border-radius: 6px;
+    color: var(--cs-accent-text);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--cs-font);
+    transition: all 0.15s;
+}
+.cs-copy-btn:hover { background: var(--cs-copy-hover); }
+.cs-copy-btn.copied {
+    background: rgba(74, 222, 128, 0.2);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: var(--cs-success);
+}
+[data-theme="retro"] .cs-copy-btn { border-radius: 0; box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff; }
 
-  // Context meter
-  html += `
-    <div class="cs-context-meter">
-      <div class="cs-meter-header">
-        <span class="cs-meter-label">컨텍스트 사용량</span>
-        <span class="cs-meter-value" style="color:${meterColor};">${info.usagePercent}% (${meterLabel})</span>
-      </div>
-      <div class="cs-meter-bar">
-        <div class="cs-meter-fill" style="width:${Math.min(info.usagePercent, 100)}%;background:${meterColor};"></div>
-      </div>
-      <div class="cs-meter-detail">
-        ${info.totalTokens.toLocaleString()} / ${info.available.toLocaleString()} 토큰 · 메시지 ${info.msgCount}개
-      </div>
-    </div>`;
+.cs-result-body {
+    padding: 14px;
+    display: none;
+}
+.cs-result-body.open { display: block; }
 
-  // Profile selector
-  html += `<div class="cs-profile-section">
-    <label class="cs-profile-label">연결 프로필 선택</label>
-    <select class="cs-profile-select" id="cs-profile-select">
-      <option value="">현재 연결 사용</option>`;
-  for (const p of profiles) {
-    const label = `${p.name || p.id} (${p.api || ''} / ${p.model || ''})`;
-    const sel = p.id === settings.profileId ? 'selected' : '';
-    html += `<option value="${p.id}" ${sel}>${escapeHtml(label)}</option>`;
-  }
-  html += `</select></div>`;
+/* ── 결과 편집 textarea ──────────────────────── */
+.cs-result-textarea {
+    width: 100%;
+    background: var(--cs-textarea-bg);
+    border: 1px solid var(--cs-input-border);
+    border-radius: 6px;
+    color: var(--cs-text);
+    font-family: var(--cs-font-mono);
+    font-size: 12.5px;
+    line-height: 1.7;
+    padding: 10px;
+    resize: vertical;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.cs-result-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
+[data-theme="retro"] .cs-result-textarea { border-radius: 0; font-family: 'Noto Sans KR', monospace; }
 
-  // Prompt toggle
-  html += `
-    <div class="cs-prompt-toggle" id="cs-prompt-toggle">
-      <span class="cs-prompt-arrow" id="cs-prompt-arrow">▶</span>
-      <span>프롬프트 편집</span>
-    </div>
-    <div class="cs-prompt-area" id="cs-prompt-area">
-      <textarea class="cs-prompt-textarea" id="cs-prompt-input">${escapeHtml(settings.promptTemplate)}</textarea>
-    </div>`;
+/* ── 전체 복사 ───────────────────────────────── */
+.cs-copy-all-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--cs-accent-light);
+    border: 1px solid var(--cs-accent-border);
+    border-radius: var(--cs-radius);
+    color: var(--cs-accent-text);
+    font-family: var(--cs-font);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.cs-copy-all-btn:hover { background: var(--cs-copy-hover); }
 
-  // Generate button
-  html += `<button class="cs-generate-btn" id="cs-generate">📝 요약 생성</button>`;
+/* ── 보조 버튼 ───────────────────────────────── */
+.cs-retry-btn {
+    width: 100%;
+    padding: 10px;
+    background: var(--cs-btn-secondary-bg);
+    border: 1px solid var(--cs-btn-secondary-border);
+    border-radius: var(--cs-radius);
+    color: var(--cs-btn-secondary-text);
+    font-family: var(--cs-font);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+}
+[data-theme="retro"] .cs-retry-btn { border-radius: 0; box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff; }
 
-  content.innerHTML = html;
+/* ── 에러 ────────────────────────────────────── */
+.cs-error { padding: 20px; text-align: center; color: var(--cs-error); font-size: 13px; font-weight: 700; }
 
-  // Profile change handler
-  const profileSelect = content.querySelector('#cs-profile-select');
-  profileSelect?.addEventListener('change', () => {
-    settings.profileId = profileSelect.value;
-    const ctx = SillyTavern.getContext();
-    ctx.saveSettingsDebounced();
-  });
-
-  // Prompt toggle handler
-  const toggleEl = content.querySelector('#cs-prompt-toggle');
-  const arrowEl = content.querySelector('#cs-prompt-arrow');
-  const areaEl = content.querySelector('#cs-prompt-area');
-  const promptInput = content.querySelector('#cs-prompt-input');
-
-  toggleEl?.addEventListener('click', () => {
-    areaEl.classList.toggle('open');
-    arrowEl.classList.toggle('open');
-  });
-
-  promptInput?.addEventListener('change', () => {
-    settings.promptTemplate = promptInput.value;
-    const ctx = SillyTavern.getContext();
-    ctx.saveSettingsDebounced();
-  });
-
-  // Generate button handler
-  const genBtn = content.querySelector('#cs-generate');
-  genBtn?.addEventListener('click', () => {
-    generateSummary(content, settings, profiles, overlay);
-  });
+/* ── 경고 팝업 ───────────────────────────────── */
+.cs-alert-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(0,0,0,0.5);
+    z-index: 9999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cs-alert-box {
+    width: 90vw;
+    max-width: 400px;
+    background: var(--cs-bg, #1a1a2e);
+    border: 1px solid var(--cs-error, #f87171);
+    border-radius: var(--cs-radius, 12px);
+    padding: 24px;
+    text-align: center;
+    font-family: var(--cs-font, 'Noto Sans KR', sans-serif);
+    color: var(--cs-text, #e0e0e0);
+}
+.cs-alert-icon { font-size: 32px; margin-bottom: 12px; }
+.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 8px; }
+.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 18px; }
+.cs-alert-ok {
+    padding: 8px 24px;
+    background: var(--cs-accent-gradient);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: var(--cs-font);
 }
 
-/* ── Generate Summary ── */
-async function generateSummary(content, settings, profiles, overlay) {
-  // Show loading
-  content.innerHTML = `
-    <div class="cs-loading">
-      <div class="cs-spinner"></div>
-      <div class="cs-loading-text">요약 중입니다...<br>시간이 걸릴 수 있습니다.</div>
-    </div>`;
-
-  const prompt = buildSummaryPrompt(settings);
-
-  try {
-    let response = '';
-    const profileId = settings.profileId;
-
-    if (profileId) {
-      // Use specific profile via CMRS
-      const ctx = SillyTavern.getContext();
-      const CMRS = ctx.ConnectionManagerRequestService;
-      if (CMRS && typeof CMRS.sendRequest === 'function') {
-        response = await CMRS.sendRequest(profileId, prompt);
-      } else {
-        throw new Error('ConnectionManagerRequestService not available');
-      }
-    } else {
-      // Use current connection
-      const ctx = SillyTavern.getContext();
-      response = await ctx.generateQuietPrompt(prompt);
-    }
-
-    if (!response || response.trim().length === 0) {
-      showError(content, '빈 응답을 받았습니다.', settings, profiles, overlay);
-      return;
-    }
-
-    const parsed = parseSummaryResult(response);
-    showResult(content, parsed, settings, profiles, overlay);
-
-  } catch (error) {
-    console.error('[CS] Error:', error);
-    showError(content, `오류: ${error.message || error}`, settings, profiles, overlay);
-  }
+/* ── 모바일 ──────────────────────────────────── */
+@media (max-width: 480px) {
+    .cs-popup { width: 96vw; height: 90vh; }
+    .cs-content { padding: 12px; }
+    .cs-textarea { min-height: 150px; font-size: 11px; }
+    [data-theme="retro"] .cs-header-title { font-size: 10px; }
 }
-
-/* ── Show Error ── */
-function showError(content, message, settings, profiles, overlay) {
-  const info = getContextInfo();
-  content.innerHTML = `
-    <div class="cs-error">
-      <div style="font-size:32px;margin-bottom:12px;">😥</div>
-      <div>${escapeHtml(message)}</div>
-    </div>
-    <div style="display:flex;gap:10px;margin-top:14px;">
-      <button class="cs-retry-btn" id="cs-error-retry" style="flex:1;">↻ 다시 시도</button>
-      <button class="cs-retry-btn" id="cs-error-back" style="flex:1;">← 돌아가기</button>
-    </div>`;
-
-  content.querySelector('#cs-error-retry')?.addEventListener('click', () => {
-    generateSummary(content, settings, profiles, overlay);
-  });
-  content.querySelector('#cs-error-back')?.addEventListener('click', () => {
-    showMainView(content, settings, profiles, info, overlay);
-  });
-}
-
-/* ── Show Result ── */
-function showResult(content, parsed, settings, profiles, overlay) {
-  const sectionLabels = {
-    Main_Characters: '👤 주요 인물',
-    Minor_Characters: '👥 보조 인물',
-    Timeline: '📅 타임라인',
-    Locations: '📍 장소',
-    Lore: '📖 로어',
-  };
-
-  let sectionsHtml = '';
-  for (const [key, label] of Object.entries(sectionLabels)) {
-    const text = parsed.sections[key] || '';
-    const has = text.trim().length > 0;
-    const rows = Math.max(3, text.split('\n').length + 2);
-    sectionsHtml += `
-      <div class="cs-result-section" data-section="${key}">
-        <div class="cs-result-header">
-          <div class="cs-result-title">
-            <span>${label}</span>
-            ${has ? '' : '<span style="font-size:11px;color:var(--cs-text-dim);">(비어있음)</span>'}
-          </div>
-          <div class="cs-result-actions">
-            <button class="cs-copy-btn" data-copy-section="${key}">복사</button>
-          </div>
-        </div>
-        <div class="cs-result-body open">
-          <textarea class="cs-result-textarea" data-section="${key}" rows="${rows}">${escapeHtml(text)}</textarea>
-        </div>
-      </div>`;
-  }
-
-  const info = getContextInfo();
-
-  content.innerHTML = `
-    <div class="cs-context-meter" style="padding:10px 14px;">
-      <div class="cs-meter-header" style="margin-bottom:0;">
-        <span class="cs-meter-label">요약 완료</span>
-        <span class="cs-meter-value" style="color:var(--cs-meter-ok);">✓</span>
-      </div>
-    </div>
-    ${sectionsHtml}
-    <button class="cs-copy-all-btn" id="cs-copy-all">📋 전체 복사</button>
-    <div style="display:flex;gap:10px;">
-      <button class="cs-retry-btn" id="cs-regenerate" style="flex:1;">↻ 다시 생성</button>
-      <button class="cs-retry-btn" id="cs-back" style="flex:1;">← 돌아가기</button>
-      <button class="cs-retry-btn" id="cs-reset" style="flex:0.8;color:var(--cs-meter-danger);">✕ 초기화</button>
-    </div>`;
-
-  // Section header toggle
-  content.querySelectorAll('.cs-result-header').forEach(header => {
-    header.addEventListener('click', (e) => {
-      if (e.target.closest('.cs-copy-btn')) return;
-      const body = header.nextElementSibling;
-      body.classList.toggle('open');
-    });
-  });
-
-  // Copy individual section
-  content.querySelectorAll('.cs-copy-btn').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const section = btn.dataset.copySection;
-      const textarea = content.querySelector(`.cs-result-textarea[data-section="${section}"]`);
-      if (textarea) copyToClipboard(textarea.value, btn);
-    });
-  });
-
-  // Copy all
-  content.querySelector('#cs-copy-all')?.addEventListener('click', function () {
-    const allText = [...content.querySelectorAll('.cs-result-textarea')]
-      .map(ta => ta.value)
-      .filter(t => t.trim())
-      .join('\n\n');
-    copyToClipboard(allText, this);
-  });
-
-  // Regenerate
-  content.querySelector('#cs-regenerate')?.addEventListener('click', () => {
-    generateSummary(content, settings, profiles, overlay);
-  });
-
-  // Back to main
-  content.querySelector('#cs-back')?.addEventListener('click', () => {
-    showMainView(content, settings, profiles, info, overlay);
-  });
-
-  // Reset (remove popup entirely)
-  content.querySelector('#cs-reset')?.addEventListener('click', () => {
-    overlay.remove();
-  });
-}
-
-/* ══════════════════════════════════
-   SETTINGS UI
-   ══════════════════════════════════ */
-function loadCsSettingsUI() {
-  const settingsContainer = document.getElementById('extensions_settings2');
-  if (!settingsContainer) return;
-
-  const settings = getCsSettings();
-
-  const html = `
-  <div class="inline-drawer">
-    <div class="inline-drawer-toggle inline-drawer-header">
-      <b>📝 Chat Summarizer</b>
-      <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
-    </div>
-    <div class="inline-drawer-content" style="font-size:small;">
-      <div style="margin-bottom:10px;">
-        <label style="display:block;margin-bottom:4px;font-weight:bold;">테마</label>
-        <select id="cs_set_theme" class="text_pole" style="width:100%;">
-          ${Object.entries(CS_THEMES).map(([k, v]) =>
-            `<option value="${k}" ${settings.theme === k ? 'selected' : ''}>${v}</option>`
-          ).join('')}
-        </select>
-      </div>
-      <div style="margin-bottom:10px;">
-        <label style="display:block;margin-bottom:4px;">
-          <input type="checkbox" id="cs_set_warn" ${settings.warnEnabled ? 'checked' : ''} />
-          컨텍스트 경고 활성화
-        </label>
-      </div>
-      <div style="margin-bottom:10px;">
-        <label style="display:block;margin-bottom:4px;font-weight:bold;">경고 임계값 (%)</label>
-        <input type="number" id="cs_set_threshold" class="text_pole" value="${settings.warnThreshold}" min="50" max="100" style="width:100%;" />
-      </div>
-      <div style="margin-bottom:10px;">
-        <label style="display:block;margin-bottom:4px;font-weight:bold;">기본 프롬프트</label>
-        <textarea id="cs_set_prompt" class="text_pole" rows="6" style="width:100%;font-size:11px;line-height:1.5;">${escapeHtml(settings.promptTemplate)}</textarea>
-      </div>
-      <div style="margin-bottom:6px;">
-        <button id="cs_set_reset_prompt" class="menu_button menu_button_icon">프롬프트 초기화</button>
-      </div>
-    </div>
-  </div>`;
-
-  settingsContainer.insertAdjacentHTML('beforeend', html);
-
-  const ctx = SillyTavern.getContext();
-
-  // Theme
-  document.getElementById('cs_set_theme')?.addEventListener('change', function () {
-    settings.theme = this.value;
-    ctx.saveSettingsDebounced();
-    // Update popup theme if open
-    const overlay = document.querySelector('.cs-overlay');
-    if (overlay) overlay.setAttribute('data-theme', this.value);
-  });
-
-  // Warning toggle
-  document.getElementById('cs_set_warn')?.addEventListener('change', function () {
-    settings.warnEnabled = this.checked;
-    ctx.saveSettingsDebounced();
-  });
-
-  // Threshold
-  document.getElementById('cs_set_threshold')?.addEventListener('change', function () {
-    settings.warnThreshold = parseInt(this.value) || 85;
-    ctx.saveSettingsDebounced();
-  });
-
-  // Prompt
-  document.getElementById('cs_set_prompt')?.addEventListener('change', function () {
-    settings.promptTemplate = this.value;
-    ctx.saveSettingsDebounced();
-  });
-
-  // Reset prompt
-  document.getElementById('cs_set_reset_prompt')?.addEventListener('click', () => {
-    settings.promptTemplate = CS_DEFAULT_PROMPT;
-    const promptEl = document.getElementById('cs_set_prompt');
-    if (promptEl) promptEl.value = CS_DEFAULT_PROMPT;
-    ctx.saveSettingsDebounced();
-  });
-}
-
-/* ══════════════════════════════════
-   BUTTON
-   ══════════════════════════════════ */
-function addCsButton() {
-  if (document.getElementById('cs-main-btn')) return;
-
-  const target =
-    document.getElementById('leftSendForm') ||
-    document.getElementById('send_form') ||
-    document.querySelector('#form_sheld .flex-container');
-
-  if (!target) {
-    console.warn('[CS] Button target not found, retrying in 2s');
-    setTimeout(addCsButton, 2000);
-    return;
-  }
-
-  const btn = document.createElement('div');
-  btn.id = 'cs-main-btn';
-  btn.title = '채팅 요약';
-  btn.className = 'fa-solid interactable';
-  btn.style.cssText = 'cursor:pointer;font-size:18px;padding:6px;display:flex;align-items:center;justify-content:center;';
-  btn.textContent = '📝';
-
-  btn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    showSummarizerPopup();
-  });
-
-  // Insert before the first child or alongside other buttons
-  const firstChild = target.querySelector('#send_but') || target.firstChild;
-  if (firstChild) {
-    target.insertBefore(btn, firstChild);
-  } else {
-    target.appendChild(btn);
-  }
-
-  console.log('[CS] Button added');
-}
-
-/* ══════════════════════════════════
-   INIT
-   ══════════════════════════════════ */
-(function init() {
-  loadCsSettingsUI();
-
-  // Add button with slight delay for DOM readiness
-  if (document.getElementById('leftSendForm') || document.getElementById('send_form')) {
-    addCsButton();
-  } else {
-    setTimeout(addCsButton, 1500);
-  }
-
-  // Hook into character message events for context warning
-  try {
-    const ctx = SillyTavern.getContext();
-    if (ctx.eventSource && ctx.eventTypes) {
-      const eventName = ctx.eventTypes.CHARACTER_MESSAGE_RENDERED
-        || ctx.eventTypes.MESSAGE_RECEIVED;
-      if (eventName) {
-        ctx.eventSource.on(eventName, () => {
-          setTimeout(checkContextWarning, 1000);
-        });
-        console.log('[CS] Context warning hook registered');
-      }
-    }
-  } catch (e) {
-    console.warn('[CS] Event hook failed:', e);
-  }
-
-  console.log('[CS] Chat Summarizer loaded');
-})();
