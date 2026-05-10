@@ -162,46 +162,6 @@ function getContextInfo() {
     };
 }
 
-    // ★ 전체 토큰 & 요약 완료 토큰
-    let allTokens = 0;
-    let summarizedTokens = 0;
-    let summarizedCount = 0;
-
-    for (const msg of ctx.chat) {
-        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
-        if (msg.extra?.cs_summarized) {
-            summarizedTokens += tokens;
-            summarizedCount++;
-        }
-        allTokens += tokens;
-    }
-
-    // ★ 실제 컨텍스트에 들어가는 토큰 계산 (뒤에서부터)
-    let inContextTokens = 0;
-    let inContextStart = ctx.chat.length; // 컨텍스트에 포함되는 첫 메시지 인덱스
-
-    for (let i = ctx.chat.length - 1; i >= 0; i--) {
-        const msg = ctx.chat[i];
-        if (msg.extra?.cs_summarized) continue; // 요약된 건 스킵
-        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
-        if (inContextTokens + tokens > available) break; // 넘치면 중단
-        inContextTokens += tokens;
-        inContextStart = i;
-    }
-
-    const truncatedCount = inContextStart; // 잘리는 메시지 수
-    const usagePercent = available > 0 ? Math.round((inContextTokens / available) * 100) : 0;
-
-    return {
-        maxContext, reservedResponse, wiBudgetTokens, available,
-        chatTokens: inContextTokens,    // 실제 컨텍스트에 들어가는 토큰
-        allTokens,                       // 전체 채팅 토큰
-        summarizedTokens, summarizedCount,
-        truncatedCount, inContextStart,  // 잘림 정보
-        usagePercent, chatLength: ctx.chat.length
-    };
-}
-
 // ===== 프로필 =====
 function getAvailableProfiles() {
     try {
@@ -405,7 +365,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         summarizedHtml = `<div class="cs-summarized-info">✓ ${info.summarizedCount}개 메시지 요약 완료 (${info.summarizedTokens.toLocaleString()} 토큰 제외됨)</div>`;
     }
 
-        let truncatedHtml = '';
+    let truncatedHtml = '';
     if (info.truncatedCount > 0) {
         truncatedHtml = `<div class="cs-truncated-info">⚠️ 메시지 0~${info.truncatedCount - 1}번 (${info.truncatedCount}개)이 컨텍스트에서 잘렸습니다</div>`;
     }
@@ -432,7 +392,7 @@ function showMainView(content, settings, profiles, info, overlay) {
             <label class="cs-label">연결 프로필</label>
             <select class="cs-select" id="cs-profile-select">${profileOpts}</select>
         </div>
-                <div class="cs-prompt-section">
+        <div class="cs-prompt-section">
             <div class="cs-prompt-toggle" id="cs-prompt-toggle">
                 <div class="cs-prompt-toggle-left">
                     <span class="cs-label">요약 프롬프트</span>
@@ -442,21 +402,20 @@ function showMainView(content, settings, profiles, info, overlay) {
             </div>
             <textarea class="cs-textarea" id="cs-prompt-area" style="display:none;">${escapeHtml(settings.promptTemplate)}</textarea>
         </div>
-
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
-    // ★ 프로필 선택
+    // 프로필 선택
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // ★ 프롬프트 토글
+    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
     const promptResetBtn = content.querySelector('#cs-prompt-reset');
-   
+
     toggleBtn.addEventListener('click', (e) => {
         if (e.target.id === 'cs-prompt-reset') return;
         const visible = promptArea.style.display !== 'none';
@@ -471,7 +430,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // ★ 프롬프트 초기화 버튼
+    // 프롬프트 초기화
     promptResetBtn.addEventListener('click', () => {
         if (!confirm('프롬프트를 기본값으로 초기화할까요?')) return;
         settings.promptTemplate = CS_DEFAULT_PROMPT;
@@ -480,7 +439,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         toastr.success('프롬프트가 기본값으로 초기화되었습니다.');
     });
 
-    // ★ 요약 생성
+    // 요약 생성
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -556,7 +515,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         Lore: '📖 로어',
     };
 
-    // ★ 모든 섹션이 비어있는지 체크
     const allEmpty = Object.values(parsed.sections).every(v => !v.trim());
 
     let sectionsHtml = '';
@@ -584,7 +542,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         }
     }
 
-    // ★ 섹션 파싱 실패 시 raw 전체 표시
     let rawFallbackHtml = '';
     if (allEmpty && parsed.raw.trim()) {
         const rawLines = Math.max(5, parsed.raw.split('\n').length + 2);
