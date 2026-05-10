@@ -96,6 +96,65 @@ function getCsSettings() {
     return s;
 }
 
+// ===== Fetch 모니터 (실측 시스템 토큰) =====
+let _csLastSystemTokens = null;
+let _csLastChatRange = null;
+
+function installFetchMonitor() {
+    if (window._csMonitorInstalled) return;
+    const origFetch = window.fetch;
+    window._csOrigFetch = origFetch;
+    window._csMonitorInstalled = true;
+
+    window.fetch = async function (...args) {
+        const [url, options] = args;
+
+        if (options?.body && typeof url === 'string' &&
+            (url.includes('/chat/completions') || url.includes('/api/backends'))) {
+            try {
+                const body = JSON.parse(options.body);
+                if (body.messages && Array.isArray(body.messages)) {
+                    const ctx = SillyTavern.getContext();
+                    let systemTokens = 0;
+                    let chatMessages = [];
+
+                    for (const m of body.messages) {
+                        if (m.role === 'system') {
+                            systemTokens += ctx.getTokenCount(m.content || '');
+                        } else {
+                            chatMessages.push(m);
+                        }
+                    }
+
+                    _csLastSystemTokens = systemTokens;
+
+                    const firstChatTokens = ctx.getTokenCount(chatMessages[0]?.content || '');
+                    let startIdx = 0;
+                    for (let i = 0; i < ctx.chat.length; i++) {
+                        const t = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                        if (Math.abs(t - firstChatTokens) / Math.max(t, 1) < 0.15) {
+                            startIdx = i;
+                            break;
+                        }
+                    }
+
+                    _csLastChatRange = {
+                        startIdx: startIdx,
+                        endIdx: ctx.chat.length - 1,
+                        truncatedCount: startIdx
+                    };
+
+                    console.log(`[CS Monitor] system=${systemTokens} tok, chat starts at msg[${startIdx}], truncated=${startIdx}`);
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        return origFetch.apply(this, args);
+    };
+
+    console.log('[Chat Summarizer] Fetch monitor installed');
+}
+
 // ===== 컨텍스트 계산 =====
 function getContextInfo() {
     const ctx = SillyTavern.getContext();
@@ -106,82 +165,84 @@ function getContextInfo() {
     const maxContext = parseInt(maxCtxEl?.value) || ctx.maxContext || 8192;
     const reservedResponse = parseInt(maxTokEl?.value) || 0;
 
-    // 로어북(World Info) 예산
-    const wiBudgetEl = document.getElementById('world_info_budget');
-    const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
-    const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
-    const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
-
-    let wiBudgetTokens = 0;
-    if (wiBudgetPercent > 0) {
-        wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
-        if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) {
-            wiBudgetTokens = wiBudgetCap;
-        }
-    }
-
-    const available = maxContext - reservedResponse - wiBudgetTokens;
-
-    // ★ 전체 토큰 + 요약완료 토큰 계산
-    let allTokens = 0;
+    let allChatTokens = 0;
     let summarizedTokens = 0;
     let summarizedCount = 0;
 
-    const msgTokens = []; // 각 메시지별 토큰 수 저장
-
-    for (let i = 0; i < ctx.chat.length; i++) {
-        const msg = ctx.chat[i];
+    for (const msg of ctx.chat) {
         const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
-        msgTokens.push(tokens);
-
         if (msg.extra?.cs_summarized) {
             summarizedTokens += tokens;
             summarizedCount++;
         } else {
-            allTokens += tokens;
+            allChatTokens += tokens;
         }
     }
 
-    // ★ 핵심: 뒤에서부터 채워서 실제로 컨텍스트에 들어가는 토큰만 계산
-    let inContextTokens = 0;
-    let truncatedCount = 0;
-    let foundTruncation = false;
+    let systemTokens;
+    let truncatedCount;
+    let inContextTokens;
 
-    for (let i = ctx.chat.length - 1; i >= 0; i--) {
-        // 요약완료된 메시지는 컨텍스트 계산에서 제외
-        if (ctx.chat[i].extra?.cs_summarized) continue;
+    if (_csLastSystemTokens !== null && _csLastChatRange !== null) {
+        systemTokens = _csLastSystemTokens;
+        truncatedCount = _csLastChatRange.truncatedCount;
+        inContextTokens = 0;
+        for (let i = _csLastChatRange.startIdx; i < ctx.chat.length; i++) {
+            if (ctx.chat[i].extra?.cs_summarized) continue;
+            inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+        }
+    } else {
+        const wiBudgetEl = document.getElementById('world_info_budget');
+        const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
+        const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
+        const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
 
-        const tokens = msgTokens[i];
-
-        if (!foundTruncation && (inContextTokens + tokens) > available) {
-            // 이 메시지부터 위쪽은 다 잘림
-            truncatedCount = i + 1; // 0~i번까지 잘림
-            foundTruncation = true;
-            // 이 메시지와 그 위의 메시지는 더 이상 세지 않음
-            break;
+        let wiBudgetTokens = 0;
+        if (wiBudgetPercent > 0) {
+            wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
+            if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) wiBudgetTokens = wiBudgetCap;
         }
 
-        inContextTokens += tokens;
+        systemTokens = wiBudgetTokens;
+        const available = maxContext - reservedResponse - wiBudgetTokens;
+
+        truncatedCount = 0;
+        inContextTokens = 0;
+        if (allChatTokens > available) {
+            let sum = 0;
+            for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                if (ctx.chat[i].extra?.cs_summarized) continue;
+                const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                if (sum + tokens > available) {
+                    truncatedCount = i + 1;
+                    break;
+                }
+                sum += tokens;
+            }
+            inContextTokens = sum;
+        } else {
+            inContextTokens = allChatTokens;
+        }
     }
 
-    // ★ 게이지에 표시할 값: 실제 컨텍스트에 들어가는 토큰 기준
+    const available = maxContext - reservedResponse - systemTokens;
     const usagePercent = available > 0 ? Math.round((inContextTokens / available) * 100) : 0;
 
     return {
         maxContext,
         reservedResponse,
-        wiBudgetTokens,
+        systemTokens,
         available,
-        chatTokens: inContextTokens,   // ★ 실제 컨텍스트에 들어가는 토큰
-        allChatTokens: allTokens,       // ★ 전체 채팅 토큰 (잘린 것 포함)
+        chatTokens: inContextTokens,
+        allChatTokens,
         summarizedTokens,
         summarizedCount,
         truncatedCount,
         usagePercent,
-        chatLength: ctx.chat.length
+        chatLength: ctx.chat.length,
+        isEstimated: _csLastSystemTokens === null
     };
 }
-
 
 // ===== 프로필 =====
 function getAvailableProfiles() {
@@ -391,10 +452,12 @@ function showMainView(content, settings, profiles, info, overlay) {
         truncatedHtml = `<div class="cs-truncated-info">⚠️ 메시지 0~${info.truncatedCount - 1}번 (${info.truncatedCount}개)이 컨텍스트에서 잘렸습니다</div>`;
     }
 
+    const estimatedBadge = info.isEstimated ? ' <span class="cs-estimated-badge">(추정)</span>' : '';
+
     content.innerHTML = `
         <div class="cs-context-meter">
             <div class="cs-meter-header">
-                <span class="cs-meter-label">컨텍스트 사용량</span>
+                <span class="cs-meter-label">컨텍스트 사용량${estimatedBadge}</span>
                 <span class="cs-meter-value">${info.usagePercent}%</span>
             </div>
             <div class="cs-meter-bar">
@@ -405,7 +468,10 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span>가용: ${info.available.toLocaleString()} 토큰</span>
             </div>
             ${info.allChatTokens > info.chatTokens ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>💬 전체 채팅: ${info.allChatTokens.toLocaleString()} 토큰</span><span>(잘린 부분 포함)</span></div>` : ''}
-            ${info.wiBudgetTokens > 0 ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>📚 로어북 예약: ${info.wiBudgetTokens.toLocaleString()} 토큰</span><span>전체: ${info.maxContext.toLocaleString()}</span></div>` : ''}
+            <div class="cs-meter-detail" style="margin-top:4px;">
+                <span>🔧 시스템: ${info.systemTokens.toLocaleString()} 토큰${info.isEstimated ? ' (추정)' : ''}</span>
+                <span>전체: ${info.maxContext.toLocaleString()}</span>
+            </div>
             ${truncatedHtml}
             ${summarizedHtml}
         </div>
@@ -426,13 +492,11 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
-    // 프로필 선택
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
@@ -452,7 +516,6 @@ function showMainView(content, settings, profiles, info, overlay) {
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // 프롬프트 초기화
     promptResetBtn.addEventListener('click', () => {
         if (!confirm('프롬프트를 기본값으로 초기화할까요?')) return;
         settings.promptTemplate = CS_DEFAULT_PROMPT;
@@ -461,7 +524,6 @@ function showMainView(content, settings, profiles, info, overlay) {
         toastr.success('프롬프트가 기본값으로 초기화되었습니다.');
     });
 
-    // 요약 생성
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -619,7 +681,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
             <button class="cs-retry-btn" id="cs-reset" style="color:var(--cs-error);">✕ 초기화</button>
         </div>`;
 
-    // 섹션 토글
     content.querySelectorAll('.cs-result-header').forEach(header => {
         header.addEventListener('click', (e) => {
             if (e.target.classList.contains('cs-copy-btn')) return;
@@ -627,7 +688,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         });
     });
 
-    // 섹션 복사
     content.querySelectorAll('.cs-copy-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -637,7 +697,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         });
     });
 
-    // 전체 복사
     content.querySelector('#cs-copy-all').addEventListener('click', function () {
         let full = '';
         content.querySelectorAll('.cs-result-textarea').forEach(ta => {
@@ -646,7 +705,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         copyToClipboard(full.trim(), this);
     });
 
-    // 요약 완료 마킹
     content.querySelector('#cs-mark-btn').addEventListener('click', async function () {
         const startIdx = parseInt(content.querySelector('#cs-mark-start').value) || 0;
         const endIdx = parseInt(content.querySelector('#cs-mark-end').value) || 0;
@@ -665,18 +723,15 @@ function showResult(content, parsed, settings, profiles, overlay) {
         toastr.success(`${count}개 메시지가 요약 완료로 표시되었습니다. 게이지: ${newInfo.usagePercent}%`);
     });
 
-    // 다시 생성
     content.querySelector('#cs-regenerate').addEventListener('click', () => {
         content.innerHTML = `<div class="cs-loading"><div class="cs-spinner"></div><span>요약 생성 중...</span></div>`;
         generateSummary(content, settings, profiles, overlay);
     });
 
-    // 돌아가기
     content.querySelector('#cs-back').addEventListener('click', () => {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
     });
 
-    // 초기화
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
@@ -783,6 +838,7 @@ function addCsButton() {
     const ctx = SillyTavern.getContext();
     loadCsSettingsUI();
     setTimeout(addCsButton, 1500);
+    installFetchMonitor();
 
     ctx.eventSource.on(ctx.eventTypes.CHARACTER_MESSAGE_RENDERED, () => {
         setTimeout(checkContextWarning, 500);
