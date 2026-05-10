@@ -165,36 +165,24 @@ function installFetchMonitor() {
 
                     _csLastSystemTokens = systemTokens;
 
-                    // ★ ctx.chat 매칭: 첫 번째 API 채팅 메시지의 토큰으로 ctx.chat에서 찾기
-                    // 더 정확한 매칭: API 채팅의 첫 user 메시지 내용 앞부분과 ctx.chat 비교
-                    let firstApiChatMsg = null;
+                    // ★ 3단계: API 채팅 메시지 개수로 ctx.chat 시작점 역산
+                    let apiChatMsgCount = 0;
                     for (let i = chatStartApiIdx; i <= chatEndApiIdx; i++) {
-                        if (body.messages[i].role === 'user' || body.messages[i].role === 'assistant') {
-                            firstApiChatMsg = body.messages[i];
-                            break;
+                        const role = body.messages[i].role;
+                        if (role === 'user' || role === 'assistant') {
+                            apiChatMsgCount++;
                         }
                     }
 
+                    // ctx.chat 끝에서부터 카운트 (요약완료 메시지 제외)
+                    let ctxChatCount = 0;
                     let startIdx = 0;
-                    if (firstApiChatMsg) {
-                        const apiContent = (firstApiChatMsg.content || '').substring(0, 100);
-                        const apiTokens = ctx.getTokenCount(firstApiChatMsg.content || '');
-
-                        for (let i = 0; i < ctx.chat.length; i++) {
-                            const chatContent = (ctx.chat[i].mes || '').substring(0, 100);
-                            const chatTokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-
-                            // 내용 앞부분 비교 (더 정확)
-                            if (chatContent.length > 10 && apiContent.length > 10 &&
-                                chatContent.substring(0, 50) === apiContent.substring(0, 50)) {
-                                startIdx = i;
-                                break;
-                            }
-                            // 폴백: 토큰 수 비교
-                            if (Math.abs(chatTokens - apiTokens) / Math.max(chatTokens, 1) < 0.05) {
-                                startIdx = i;
-                                break;
-                            }
+                    for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                        if (ctx.chat[i].extra?.cs_summarized) continue;
+                        ctxChatCount++;
+                        if (ctxChatCount >= apiChatMsgCount) {
+                            startIdx = i;
+                            break;
                         }
                     }
 
@@ -204,8 +192,8 @@ function installFetchMonitor() {
                         truncatedCount: startIdx
                     };
 
-                    console.log(`[CS Monitor] system=${systemTokens} tok, chatApi=${chatApiTokens} tok, chat starts at msg[${startIdx}], truncated=${startIdx}`);
-                }
+                    console.log(`[CS Monitor] system=${systemTokens}, chatApi=${chatApiTokens}, apiChatMsgs=${apiChatMsgCount}, ctxChat=${ctx.chat.length}, startIdx=${startIdx}, truncated=${startIdx}`);
+
             } catch (e) { /* ignore */ }
         }
 
