@@ -576,7 +576,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         content.innerHTML = `
             <div class="cs-loading">
                 <div class="cs-spinner"></div>
-                <span>요약 생성 중... 시간이 좀 걸릴 수 있어요</span>
+                <span>요약 생성 중... </span>
             </div>`;
         generateSummary(content, settings, profiles, overlay);
     });
