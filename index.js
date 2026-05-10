@@ -92,10 +92,7 @@ function getCsSettings() {
         if (!Object.hasOwn(s, key)) s[key] = CS_DEFAULTS[key];
     }
     if (!s.promptTemplate) s.promptTemplate = CS_DEFAULT_PROMPT;
-
-    // 기존 'cyber' 테마를 'dark'로 마이그레이션
     if (s.theme === 'cyber') s.theme = 'dark';
-
     return s;
 }
 
@@ -255,7 +252,14 @@ function showContextWarning(info) {
 function showSummarizerPopup() {
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
+        // ★ 팝업을 다시 열 때 항상 최신 info로 메인 뷰 갱신
         existing.style.display = 'flex';
+        const settings = getCsSettings();
+        const profiles = getAvailableProfiles();
+        const info = getContextInfo();
+        existing.setAttribute('data-theme', settings.theme);
+        const content = existing.querySelector('.cs-content');
+        if (content) showMainView(content, settings, profiles, info, existing);
         return;
     }
 
@@ -322,7 +326,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         warningHtml = `
             <div class="cs-warning-banner">
                 <span class="cs-warning-icon">⚠️</span>
-                <span>컨텍스트 사용량이 ${info.usagePercent}%입니다. 요약을 권장합니다!</span>
+                <span>컨텍스트 사용량이 ${info.usagePercent}%입니다.<br>요약을 권장합니다!</span>
             </div>`;
     }
 
@@ -437,7 +441,7 @@ async function generateSummary(content, settings, profiles, overlay) {
 // ===== 에러 =====
 function showError(content, msg, settings, profiles, overlay) {
     content.innerHTML = `
-        <div class="cs-error">에러: ${escapeHtml(msg)}</div>
+        <div class="cs-error-msg">에러: ${escapeHtml(msg)}</div>
         <button class="cs-retry-btn" id="cs-retry">↻ 돌아가기</button>`;
     content.querySelector('#cs-retry').addEventListener('click', () => {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
@@ -478,8 +482,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
             </div>`;
     }
 
-    // 요약 완료 마킹할 범위 계산
-    // 이미 요약된 메시지 다음부터 ~ 마지막 메시지까지를 기본값으로
     let defaultStart = 0;
     for (let i = 0; i < ctx.chat.length; i++) {
         if (ctx.chat[i].extra?.cs_summarized) defaultStart = i + 1;
@@ -509,10 +511,10 @@ function showResult(content, parsed, settings, profiles, overlay) {
             </div>
             <button class="cs-mark-btn" id="cs-mark-btn" style="margin-top:10px;">✓ 요약 완료로 표시</button>
         </div>
-        <div style="display:flex;gap:10px;">
-            <button class="cs-retry-btn" id="cs-regenerate" style="flex:1;">↻ 다시 생성</button>
-            <button class="cs-retry-btn" id="cs-back" style="flex:1;">← 돌아가기</button>
-            <button class="cs-retry-btn" id="cs-reset" style="flex:0.8;color:var(--cs-error);">✕ 초기화</button>
+        <div class="cs-bottom-actions">
+            <button class="cs-retry-btn" id="cs-regenerate">↻ 다시 생성</button>
+            <button class="cs-retry-btn" id="cs-back">← 돌아가기</button>
+            <button class="cs-retry-btn" id="cs-reset" style="color:var(--cs-error);">✕ 초기화</button>
         </div>`;
 
     // 섹션 토글
@@ -557,7 +559,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         this.style.pointerEvents = 'none';
         this.style.opacity = '0.6';
 
-        // 게이지 업데이트를 위해 info 새로 계산
         const newInfo = getContextInfo();
         toastr.success(`${count}개 메시지가 요약 완료로 표시되었습니다. 게이지: ${newInfo.usagePercent}%`);
     });
@@ -651,7 +652,7 @@ function addCsButton() {
     btn.id = 'chat-summarizer-btn';
     btn.textContent = '📝';
     btn.title = '채팅 요약';
-    btn.style.cssText = 'cursor:pointer;font-size:1.2em;padding:3px 5px;border-radius:5px;transition:background 0.2s;z-index:9999;';
+    btn.style.cssText = 'cursor:pointer;font-size:1.2em;padding:3px 5px;border-radius:5px;transition:background 0.2s;';
     btn.addEventListener('click', () => {
         const ctx = SillyTavern.getContext();
         if (!ctx.chat || ctx.chat.length === 0) {
@@ -661,18 +662,19 @@ function addCsButton() {
         showSummarizerPopup();
     });
 
-    const wrapper = document.getElementById('cb-btn-wrapper');
-    if (wrapper) {
-        wrapper.appendChild(btn);
-    } else {
-        const newWrapper = document.createElement('div');
-        newWrapper.id = 'cb-btn-wrapper';
-        newWrapper.style.cssText = 'display:flex;flex-direction:row;gap:4px;align-self:flex-start;';
-        newWrapper.appendChild(btn);
-        const sendForm = document.getElementById('send_form');
-        if (sendForm && sendForm.firstChild) sendForm.insertBefore(newWrapper, sendForm.firstChild);
-        else if (sendForm) sendForm.appendChild(newWrapper);
+    // ★ 기존 래퍼가 있으면 거기에 추가, 없으면 send_form 또는 leftSendForm에 삽입
+    const existingWrapper = document.getElementById('cb-btn-wrapper');
+    if (existingWrapper) {
+        existingWrapper.appendChild(btn);
+        return;
     }
+
+    // ★ send_form 내부 맨 앞에 삽입 (래퍼 없이 직접)
+    const sendForm = document.getElementById('leftSendForm') || document.getElementById('send_form');
+    if (sendForm) {
+        sendForm.insertBefore(btn, sendForm.firstChild);
+    }
+
     console.log('[Chat Summarizer] Button added');
 }
 
