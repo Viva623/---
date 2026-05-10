@@ -10,7 +10,7 @@ const CS_THEMES = {
 const CS_DEFAULTS = Object.freeze({
     profileId: '',
     warnEnabled: true,
-    warnThreshold: 85,
+    warnThreshold: 75,
     promptTemplate: '',
     theme: 'dark',
 });
@@ -495,7 +495,7 @@ function showMainView(content, settings, profiles, info, overlay) {
     });
 
     let warningHtml = '';
-    if (info.usagePercent >= 85) {
+    if (info.usagePercent >= settings.warnThreshold) {
         warningHtml = `
             <div class="cs-warning-banner">
                 <span class="cs-warning-icon">⚠️</span>
