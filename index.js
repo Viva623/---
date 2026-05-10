@@ -884,7 +884,9 @@ function addCsButton() {
     const ctx = SillyTavern.getContext();
     loadCsSettingsUI();
     setTimeout(addCsButton, 1500);
-    installFetchMonitor();
+    
+    // ★ 모니터를 늦게 설치해서 다른 익스텐션 fetch 덮어쓰기 이후에 끼어들기
+    setTimeout(installFetchMonitor, 3000);
 
     ctx.eventSource.on(ctx.eventTypes.CHARACTER_MESSAGE_RENDERED, () => {
         setTimeout(checkContextWarning, 500);
