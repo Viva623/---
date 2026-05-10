@@ -292,7 +292,7 @@
 .cs-prompt-toggle-icon.open { transform: rotate(90deg); }
 
 /* ── 프롬프트 토글 오른쪽 영역 ───────────────── */
-.cs-prompt-toggle-right {
+.cs-prompt-toggle-left {
     display: flex;
     align-items: center;
     gap: 10px;
