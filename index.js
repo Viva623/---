@@ -10,7 +10,7 @@ const CS_THEMES = {
 const CS_DEFAULTS = Object.freeze({
     profileId: '',
     warnEnabled: true,
-    warnThreshold: 75,  // ★ 85 → 75
+    warnThreshold: 75,
     promptTemplate: '',
     theme: 'dark',
 });
@@ -120,7 +120,6 @@ function installFetchMonitor() {
                     let chatEndApiIdx = -1;
                     let chatStartApiIdx = -1;
 
-                    // 마지막 assistant 찾기
                     for (let i = body.messages.length - 1; i >= 0; i--) {
                         if (body.messages[i].role === 'assistant') {
                             chatEndApiIdx = i;
@@ -128,7 +127,6 @@ function installFetchMonitor() {
                         }
                     }
 
-                    // 채팅 시작점 찾기: 교대 패턴 역추적
                     if (chatEndApiIdx > 0) {
                         chatStartApiIdx = chatEndApiIdx;
                         for (let i = chatEndApiIdx - 1; i >= 0; i--) {
@@ -136,7 +134,6 @@ function installFetchMonitor() {
                             if (curr === 'user' || curr === 'assistant') {
                                 chatStartApiIdx = i;
                             } else if (curr === 'system') {
-                                // 시스템 메시지가 중간에 끼면 건너뛰기
                                 continue;
                             } else {
                                 break;
@@ -170,7 +167,6 @@ function installFetchMonitor() {
                         }
                     }
 
-                    // ctx.chat 끝에서부터 카운트 (요약완료 메시지 제외)
                     let ctxChatCount = 0;
                     let startIdx = 0;
                     for (let i = ctx.chat.length - 1; i >= 0; i--) {
@@ -227,17 +223,15 @@ function getContextInfo() {
     let truncatedCount;
     let inContextTokens;
 
-    // 변경
     if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
         systemTokens = window._csLastSystemTokens;
         truncatedCount = window._csLastChatRange.truncatedCount;
         inContextTokens = 0;
-        for (let i = _csLastChatRange.startIdx; i < ctx.chat.length; i++) {
+        for (let i = window._csLastChatRange.startIdx; i < ctx.chat.length; i++) {
             if (ctx.chat[i].extra?.cs_summarized) continue;
             inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
         }
     } else {
-        // ★ 추정: WI 예산으로 계산
         const wiBudgetEl = document.getElementById('world_info_budget');
         const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
         const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
@@ -480,7 +474,7 @@ function showMainView(content, settings, profiles, info, overlay) {
     });
 
     let warningHtml = '';
-    if (info.usagePercent >= settings.warnThreshold) {  // ★ 설정값 연동
+    if (info.usagePercent >= settings.warnThreshold) {
         warningHtml = `
             <div class="cs-warning-banner">
                 <span class="cs-warning-icon">⚠️</span>
@@ -576,7 +570,7 @@ function showMainView(content, settings, profiles, info, overlay) {
         content.innerHTML = `
             <div class="cs-loading">
                 <div class="cs-spinner"></div>
-                <span>요약 생성 중... </span>
+                <span>요약 생성 중...</span>
             </div>`;
         generateSummary(content, settings, profiles, overlay);
     });
@@ -597,14 +591,33 @@ async function generateSummary(content, settings, profiles, overlay) {
                 { role: 'user', content: prompt },
             ];
             const response = await CMRS.sendRequest(settings.profileId, messages, 16000, {
-                stream: false, signal: null, extractData: true, includePreset: false, includeInstruct: false,
+                stream: true, signal: null, extractData: true, includePreset: false, includeInstruct: false,
             });
 
-            if (typeof response === 'string') result = response;
-            else if (response?.choices?.[0]?.message?.content) result = response.choices[0].message.content;
-            else if (response?.content) result = response.content;
-            else if (response?.text) result = response.text;
-            else result = String(response);
+            // ★ 스트리밍 응답 처리
+            if (typeof response === 'function') {
+                const streamGen = response();
+                let lastText = '';
+                for await (const chunk of streamGen) {
+                    lastText = chunk.text || '';
+                    const loadingSpan = content.querySelector('.cs-loading span');
+                    if (loadingSpan) {
+                        const charCount = lastText.length;
+                        loadingSpan.textContent = `요약 생성 중... (${charCount.toLocaleString()}자)`;
+                    }
+                }
+                result = lastText;
+            } else if (typeof response === 'string') {
+                result = response;
+            } else if (response?.content) {
+                result = response.content;
+            } else if (response?.choices?.[0]?.message?.content) {
+                result = response.choices[0].message.content;
+            } else if (response?.text) {
+                result = response.text;
+            } else {
+                result = String(response);
+            }
         } else {
             result = await ctx.generateQuietPrompt({
                 quietPrompt: prompt, skipWIAN: true, removeReasoning: true,
@@ -884,7 +897,7 @@ function addCsButton() {
     const ctx = SillyTavern.getContext();
     loadCsSettingsUI();
     setTimeout(addCsButton, 1500);
-    
+
     // ★ 모니터를 늦게 설치해서 다른 익스텐션 fetch 덮어쓰기 이후에 끼어들기
     setTimeout(installFetchMonitor, 3000);
 
