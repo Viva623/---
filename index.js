@@ -353,13 +353,15 @@ function showMainView(content, settings, profiles, info, overlay) {
             <label class="cs-label">연결 프로필</label>
             <select class="cs-select" id="cs-profile-select">${profileOpts}</select>
         </div>
-        <div class="cs-prompt-section">
+                <div class="cs-prompt-section">
             <div class="cs-prompt-toggle" id="cs-prompt-toggle">
                 <span class="cs-label">요약 프롬프트</span>
-                <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
+                <div class="cs-prompt-toggle-right">
+                    <button class="cs-prompt-reset-btn" id="cs-prompt-reset" style="display:none;">↻ 초기화</button>
+                    <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
+                </div>
             </div>
             <textarea class="cs-textarea" id="cs-prompt-area" style="display:none;">${escapeHtml(settings.promptTemplate)}</textarea>
-            <button class="cs-prompt-reset-btn" id="cs-prompt-reset" style="display:none;">↻ 프롬프트 초기화</button>
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
@@ -374,11 +376,12 @@ function showMainView(content, settings, profiles, info, overlay) {
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
     const promptResetBtn = content.querySelector('#cs-prompt-reset');
-
-    toggleBtn.addEventListener('click', () => {
+   
+    toggleBtn.addEventListener('click', (e) => {
+        if (e.target.id === 'cs-prompt-reset') return;
         const visible = promptArea.style.display !== 'none';
         promptArea.style.display = visible ? 'none' : 'block';
-        promptResetBtn.style.display = visible ? 'none' : 'block';  // ★ 초기화 버튼도 같이 토글
+        promptResetBtn.style.display = visible ? 'none' : 'inline-block';
         toggleIcon.textContent = visible ? '▶' : '▼';
         toggleIcon.classList.toggle('open', !visible);
     });
