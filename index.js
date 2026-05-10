@@ -10,7 +10,7 @@ const CS_THEMES = {
 const CS_DEFAULTS = Object.freeze({
     profileId: '',
     warnEnabled: true,
-    warnThreshold: 75,
+    warnThreshold: 75,  // ★ 85 → 75
     promptTemplate: '',
     theme: 'dark',
 });
@@ -116,13 +116,11 @@ function installFetchMonitor() {
                 if (body.messages && Array.isArray(body.messages)) {
                     const ctx = SillyTavern.getContext();
 
-                    // ★ user/assistant 메시지 중 실제 채팅만 추출
-                    // 연속된 user↔assistant 교대 패턴을 찾아서 채팅 영역 판별
-                    let systemTokens = 0;
-                    let chatStartApiIdx = -1;
+                    // ★ 1단계: API 메시지에서 채팅 영역 찾기 (역방향)
                     let chatEndApiIdx = -1;
+                    let chatStartApiIdx = -1;
 
-                    // 뒤에서부터 탐색: 마지막 assistant 메시지 = 마지막 채팅
+                    // 마지막 assistant 찾기
                     for (let i = body.messages.length - 1; i >= 0; i--) {
                         if (body.messages[i].role === 'assistant') {
                             chatEndApiIdx = i;
@@ -130,17 +128,12 @@ function installFetchMonitor() {
                         }
                     }
 
-                    // 채팅 시작점 찾기: chatEndApiIdx에서 거슬러 올라가며
-                    // user↔assistant 교대가 끊기는 지점
+                    // 채팅 시작점 찾기: 교대 패턴 역추적
                     if (chatEndApiIdx > 0) {
                         chatStartApiIdx = chatEndApiIdx;
                         for (let i = chatEndApiIdx - 1; i >= 0; i--) {
                             const curr = body.messages[i].role;
-                            const next = body.messages[i + 1].role;
-                            // user→assistant 또는 assistant→user 교대 패턴
-                            if ((curr === 'user' || curr === 'assistant') &&
-                                (curr !== next) &&
-                                (curr === 'user' || curr === 'assistant')) {
+                            if (curr === 'user' || curr === 'assistant') {
                                 chatStartApiIdx = i;
                             } else if (curr === 'system') {
                                 // 시스템 메시지가 중간에 끼면 건너뛰기
@@ -151,12 +144,15 @@ function installFetchMonitor() {
                         }
                     }
 
-                    // 시스템 토큰 = 전체 - 채팅 영역
+                    // ★ 2단계: 시스템 토큰 계산
+                    let systemTokens = 0;
                     let chatApiTokens = 0;
+
                     for (let i = 0; i < body.messages.length; i++) {
                         const tokens = ctx.getTokenCount(body.messages[i].content || '');
+                        const role = body.messages[i].role;
                         if (i >= chatStartApiIdx && i <= chatEndApiIdx &&
-                            (body.messages[i].role === 'user' || body.messages[i].role === 'assistant')) {
+                            (role === 'user' || role === 'assistant')) {
                             chatApiTokens += tokens;
                         } else {
                             systemTokens += tokens;
@@ -193,7 +189,7 @@ function installFetchMonitor() {
                     };
 
                     console.log(`[CS Monitor] system=${systemTokens}, chatApi=${chatApiTokens}, apiChatMsgs=${apiChatMsgCount}, ctxChat=${ctx.chat.length}, startIdx=${startIdx}, truncated=${startIdx}`);
-
+                }
             } catch (e) { /* ignore */ }
         }
 
@@ -202,7 +198,6 @@ function installFetchMonitor() {
 
     console.log('[Chat Summarizer] Fetch monitor installed');
 }
-
 
 // ===== 컨텍스트 계산 =====
 function getContextInfo() {
@@ -233,6 +228,7 @@ function getContextInfo() {
     let inContextTokens;
 
     if (_csLastSystemTokens !== null && _csLastChatRange !== null) {
+        // ★ 실측값 사용
         systemTokens = _csLastSystemTokens;
         truncatedCount = _csLastChatRange.truncatedCount;
         inContextTokens = 0;
@@ -241,6 +237,7 @@ function getContextInfo() {
             inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
         }
     } else {
+        // ★ 추정: WI 예산으로 계산
         const wiBudgetEl = document.getElementById('world_info_budget');
         const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
         const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
@@ -483,7 +480,7 @@ function showMainView(content, settings, profiles, info, overlay) {
     });
 
     let warningHtml = '';
-    if (info.usagePercent >= settings.warnThreshold) {
+    if (info.usagePercent >= settings.warnThreshold) {  // ★ 설정값 연동
         warningHtml = `
             <div class="cs-warning-banner">
                 <span class="cs-warning-icon">⚠️</span>
@@ -845,7 +842,7 @@ function loadCsSettingsUI() {
     });
 
     $('#cs_warn_threshold').on('input', function () {
-        settings.warnThreshold = parseInt($(this).val(), 10) || 85;
+        settings.warnThreshold = parseInt($(this).val(), 10) || 75;
         save();
     });
 }
