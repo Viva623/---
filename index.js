@@ -122,45 +122,66 @@ function getContextInfo() {
 
     const available = maxContext - reservedResponse - wiBudgetTokens;
 
-    // 전체 채팅 토큰 계산
-    let chatTokens = 0;
+    // ★ 전체 토큰 + 요약완료 토큰 계산
+    let allTokens = 0;
     let summarizedTokens = 0;
     let summarizedCount = 0;
 
-    for (const msg of ctx.chat) {
+    const msgTokens = []; // 각 메시지별 토큰 수 저장
+
+    for (let i = 0; i < ctx.chat.length; i++) {
+        const msg = ctx.chat[i];
         const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+        msgTokens.push(tokens);
+
         if (msg.extra?.cs_summarized) {
             summarizedTokens += tokens;
             summarizedCount++;
         } else {
-            chatTokens += tokens;
+            allTokens += tokens;
         }
     }
 
-    // 잘림 계산: 전체 토큰이 가용치를 넘으면 뒤에서부터 채워서 어디서 잘리는지 확인
+    // ★ 핵심: 뒤에서부터 채워서 실제로 컨텍스트에 들어가는 토큰만 계산
+    let inContextTokens = 0;
     let truncatedCount = 0;
-    if (chatTokens > available) {
-        let sum = 0;
-        for (let i = ctx.chat.length - 1; i >= 0; i--) {
-            if (ctx.chat[i].extra?.cs_summarized) continue;
-            const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-            if (sum + tokens > available) {
-                truncatedCount = i + 1;
-                break;
-            }
-            sum += tokens;
+    let foundTruncation = false;
+
+    for (let i = ctx.chat.length - 1; i >= 0; i--) {
+        // 요약완료된 메시지는 컨텍스트 계산에서 제외
+        if (ctx.chat[i].extra?.cs_summarized) continue;
+
+        const tokens = msgTokens[i];
+
+        if (!foundTruncation && (inContextTokens + tokens) > available) {
+            // 이 메시지부터 위쪽은 다 잘림
+            truncatedCount = i + 1; // 0~i번까지 잘림
+            foundTruncation = true;
+            // 이 메시지와 그 위의 메시지는 더 이상 세지 않음
+            break;
         }
+
+        inContextTokens += tokens;
     }
 
-    const usagePercent = available > 0 ? Math.round((chatTokens / available) * 100) : 0;
+    // ★ 게이지에 표시할 값: 실제 컨텍스트에 들어가는 토큰 기준
+    const usagePercent = available > 0 ? Math.round((inContextTokens / available) * 100) : 0;
 
     return {
-        maxContext, reservedResponse, wiBudgetTokens, available,
-        chatTokens, summarizedTokens, summarizedCount,
+        maxContext,
+        reservedResponse,
+        wiBudgetTokens,
+        available,
+        chatTokens: inContextTokens,   // ★ 실제 컨텍스트에 들어가는 토큰
+        allChatTokens: allTokens,       // ★ 전체 채팅 토큰 (잘린 것 포함)
+        summarizedTokens,
+        summarizedCount,
         truncatedCount,
-        usagePercent, chatLength: ctx.chat.length
+        usagePercent,
+        chatLength: ctx.chat.length
     };
 }
+
 
 // ===== 프로필 =====
 function getAvailableProfiles() {
@@ -383,6 +404,7 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span>
                 <span>가용: ${info.available.toLocaleString()} 토큰</span>
             </div>
+            ${info.allChatTokens > info.chatTokens ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>💬 전체 채팅: ${info.allChatTokens.toLocaleString()} 토큰</span><span>(잘린 부분 포함)</span></div>` : ''}
             ${info.wiBudgetTokens > 0 ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>📚 로어북 예약: ${info.wiBudgetTokens.toLocaleString()} 토큰</span><span>전체: ${info.maxContext.toLocaleString()}</span></div>` : ''}
             ${truncatedHtml}
             ${summarizedHtml}
