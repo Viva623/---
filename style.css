@@ -289,6 +289,41 @@
 }
 .cs-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
 
+/* ── 프롬프트 초기화 버튼 ────────────────────── */
+.cs-prompt-reset-btn {
+    padding: 8px 14px;
+    background: var(--cs-btn-secondary-bg);
+    border: 1px solid var(--cs-btn-secondary-border);
+    border-radius: var(--cs-radius);
+    color: var(--cs-warning-text);
+    font-family: var(--cs-font);
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 6px;
+    align-self: flex-start;
+}
+.cs-prompt-reset-btn:hover {
+    opacity: 0.8;
+}
+
+/* 레트로 전용 */
+[data-theme="retro"] .cs-prompt-reset-btn {
+    border-radius: 0;
+    border: 2px outset #e0b8d0;
+}
+[data-theme="retro"] .cs-prompt-reset-btn:active {
+    border-style: inset;
+}
+
+/* 로판 전용 */
+[data-theme="romance"] .cs-prompt-reset-btn {
+    background: rgba(200,160,60,0.05);
+    border: 1px solid rgba(200,160,60,0.2);
+    color: #e8c868;
+}
+
 /* ── 범위 선택 ───────────────────────────────── */
 .cs-range-section {
     background: var(--cs-card-bg);
