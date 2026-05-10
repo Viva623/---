@@ -1,577 +1,612 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&family=Noto+Serif+KR:wght@400;600&family=Press+Start+2P&display=swap');
+const CS_MODULE = 'chat_summarizer';
 
-/* ── CSS 변수 (테마별) ───────────────────────── */
+const CS_THEMES = {
+    cyber:   '🔮 사이버펑크',
+    retro:   '🖥️ 레트로 PC',
+    romance: '🌸 로판',
+    magical: '⭐ 마법소녀',
+    simple:  '📄 심플',
+};
 
-/* 사이버펑크 (기본) */
-.cs-overlay[data-theme="cyber"] {
-    --cs-bg: #1a1a2e;
-    --cs-header-bg: #16162a;
-    --cs-card-bg: #222244;
-    --cs-border: #333;
-    --cs-text: #e0e0e0;
-    --cs-text-sub: #aaa;
-    --cs-text-dim: #666;
-    --cs-accent: #a855f7;
-    --cs-accent-gradient: linear-gradient(135deg, #6c5ce7, #a855f7);
-    --cs-accent-light: rgba(168, 85, 247, 0.2);
-    --cs-accent-border: rgba(168, 85, 247, 0.4);
-    --cs-accent-text: #c4b5fd;
-    --cs-input-bg: #222244;
-    --cs-input-border: #444;
-    --cs-input-focus: #6c5ce7;
-    --cs-btn-secondary-bg: rgba(255,255,255,0.08);
-    --cs-btn-secondary-border: #555;
-    --cs-btn-secondary-text: #ccc;
-    --cs-success: #4ade80;
-    --cs-warning-bg: rgba(239, 68, 68, 0.15);
-    --cs-warning-border: rgba(239, 68, 68, 0.4);
-    --cs-warning-text: #fca5a5;
-    --cs-error: #f87171;
-    --cs-shadow: 0 8px 32px rgba(0,0,0,0.5);
-    --cs-radius: 12px;
-    --cs-font: 'Noto Sans KR', sans-serif;
-    --cs-font-mono: 'Noto Sans KR', monospace;
-    --cs-close-bg: rgba(255,255,255,0.1);
-    --cs-close-border: #555;
-    --cs-close-text: #ccc;
-    --cs-meter-track: #333;
-    --cs-copy-hover: rgba(168, 85, 247, 0.3);
-    --cs-section-hover: #252550;
-    --cs-textarea-bg: #1a1a2e;
-}
+const CS_DEFAULTS = Object.freeze({
+    profileId: '',
+    warnEnabled: true,
+    warnThreshold: 85,
+    promptTemplate: '',
+    theme: 'cyber',
+});
 
-/* 레트로 PC */
-.cs-overlay[data-theme="retro"] {
-    --cs-bg: #c0c0c0;
-    --cs-header-bg: linear-gradient(90deg, #000080, #1084d0);
-    --cs-card-bg: #fff;
-    --cs-border: #808080;
-    --cs-text: #000;
-    --cs-text-sub: #444;
-    --cs-text-dim: #808080;
-    --cs-accent: #000080;
-    --cs-accent-gradient: linear-gradient(180deg, #dfdfdf, #c0c0c0);
-    --cs-accent-light: rgba(0, 0, 128, 0.1);
-    --cs-accent-border: #808080;
-    --cs-accent-text: #000080;
-    --cs-input-bg: #fff;
-    --cs-input-border: #808080;
-    --cs-input-focus: #000080;
-    --cs-btn-secondary-bg: #dfdfdf;
-    --cs-btn-secondary-border: #808080;
-    --cs-btn-secondary-text: #000;
-    --cs-success: #008000;
-    --cs-warning-bg: rgba(255, 255, 0, 0.3);
-    --cs-warning-border: #808000;
-    --cs-warning-text: #804000;
-    --cs-error: #ff0000;
-    --cs-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
-    --cs-radius: 0px;
-    --cs-font: 'Press Start 2P', 'Noto Sans KR', monospace;
-    --cs-font-mono: 'Press Start 2P', monospace;
-    --cs-close-bg: #c0c0c0;
-    --cs-close-border: #808080;
-    --cs-close-text: #000;
-    --cs-meter-track: #808080;
-    --cs-copy-hover: rgba(0, 0, 128, 0.2);
-    --cs-section-hover: #e8e8e8;
-    --cs-textarea-bg: #fff;
-}
+const CS_DEFAULT_PROMPT = `[Pause the roleplay. You are the Game Master—an entity responsible for tracking all events, characters, and world details. Your task is to write a detailed report of the roleplay so far to keep the story focused and internally consistent. Deep-analyze today's entire chat history, world info, and character interactions, then produce a summary without continuing the roleplay. Output YAML only, wrapped in <summary></summary> tags.]
 
-/* 로판 */
-.cs-overlay[data-theme="romance"] {
-    --cs-bg: #fdf6ee;
-    --cs-header-bg: linear-gradient(135deg, #f5e6d3, #eedcc8);
-    --cs-card-bg: #fff;
-    --cs-border: #e0d0bc;
-    --cs-text: #4a3728;
-    --cs-text-sub: #8a7560;
-    --cs-text-dim: #bba88e;
-    --cs-accent: #c08b5c;
-    --cs-accent-gradient: linear-gradient(135deg, #d4a574, #c08b5c);
-    --cs-accent-light: rgba(192, 139, 92, 0.12);
-    --cs-accent-border: rgba(192, 139, 92, 0.35);
-    --cs-accent-text: #a06830;
-    --cs-input-bg: #fefcf9;
-    --cs-input-border: #e0d0bc;
-    --cs-input-focus: #c08b5c;
-    --cs-btn-secondary-bg: #f5ede4;
-    --cs-btn-secondary-border: #e0d0bc;
-    --cs-btn-secondary-text: #6b5540;
-    --cs-success: #7a9e6e;
-    --cs-warning-bg: rgba(200, 120, 80, 0.12);
-    --cs-warning-border: rgba(200, 120, 80, 0.35);
-    --cs-warning-text: #a05530;
-    --cs-error: #c05050;
-    --cs-shadow: 0 4px 20px rgba(120, 80, 40, 0.1);
-    --cs-radius: 14px;
-    --cs-font: 'Noto Serif KR', serif;
-    --cs-font-mono: 'Noto Serif KR', serif;
-    --cs-close-bg: #f5ede4;
-    --cs-close-border: #e0d0bc;
-    --cs-close-text: #6b5540;
-    --cs-meter-track: #e8ddd0;
-    --cs-copy-hover: rgba(192, 139, 92, 0.2);
-    --cs-section-hover: #faf4ec;
-    --cs-textarea-bg: #fefcf9;
+Critical: Avoid Redundant Summarization
+Before writing, scan for any existing summary in <summary> tags or timeline data in the lorebook/world info.
+
+If a prior summary or lorebook timeline exists, identify the last recorded timestamp (the most recent event entry).
+Your new summary begins AFTER that timestamp. Do NOT re-summarize, restate, or duplicate anything already recorded.
+For the Timeline section specifically: start logging from the first event that occurs after the last recorded timestamp.
+For Main Characters / Minor Characters / Locations / Lore: only add new entries or update existing entries with changes that occurred after the last recorded point. Do not rewrite unchanged information.
+If NO prior summary or lorebook timeline exists, summarize the full chat history from the beginning.
+
+Timeline vs Lore Division Rule:
+
+Timeline records WHAT HAPPENED: actions, dialogue, events in sequence.
+- Include key dialogue lines verbatim (quoted).
+- For recurring systems/patterns, write a ONE-LINE contextual hint on first occurrence, then reference by name only on subsequent occurrences.
+
+Lore records WHAT SOMETHING IS: definitions, mechanics, accumulated patterns, symbolic meaning, character analysis.
+- When a new system/pattern/rule is established in a scene, create or update its Lore entry with full explanation.
+- When an existing system appears in a new scene, update the Lore entry ONLY if something changed.
+
+Neither section should fully duplicate the other. Timeline provides narrative context; Lore provides reference context.
+
+NPC & Location Scope Rules:
+
+LOCATIONS — answer ONLY "What does this place look like?"
+- Physical description: architecture, layout, key rooms/objects, sensory details.
+- DO NOT include events, character emotions, or analysis.
+- Merge repeated entries into ONE entry.
+
+MINOR CHARACTERS (NPCs) — answer ONLY "Who is this person?"
+- Identity: name, age, affiliation/role, 1-2 physical identifiers.
+- Traits: bracketed list, max 3-5 items.
+- DO NOT include scene-by-scene actions (→ Timeline).
+
+MAIN CHARACTERS — follow the template below.
+
+CROSS-REFERENCE RULE: Use "(→ Section: Entry)" pointers instead of restating information.
+MERGE / DEDUP RULE: Keep the LONGEST version in its primary section; replace copies with pointers.
+
+Your summary must include all of the following sections:
+
+Main_Characters:
+  - name: (Full Name)
+    appearance: (species, physical details)
+    role: (who they are in the story, 1-2 sentences)
+    traits: ["trait1", "trait2", "trait3"]
+    items: ["item1", "item2"]
+    cloths: ["clothing1", "clothing2"]
+
+Minor_Characters:
+##(Name): (Brief description—role, traits, appearance in 1-2 lines)
+
+Timeline:
+##(Date)
+###(Time)
+  - (Event description)
+
+Locations:
+##(Place Name): (Physical description in 1-2 lines)
+
+Lore:
+##(Entry Name): (Definition/explanation)
+
+> If an earlier summary exists, append only new events and changed entries. Return the complete merged YAML inside <summary></summary> tags only—no commentary outside the tags.`;
+
+// ===== 설정 =====
+function getCsSettings() {
+    const ctx = SillyTavern.getContext();
+    if (!ctx.extensionSettings[CS_MODULE]) {
+        ctx.extensionSettings[CS_MODULE] = structuredClone(CS_DEFAULTS);
+    }
+    const s = ctx.extensionSettings[CS_MODULE];
+    for (const key of Object.keys(CS_DEFAULTS)) {
+        if (!Object.hasOwn(s, key)) s[key] = CS_DEFAULTS[key];
+    }
+    if (!s.promptTemplate) s.promptTemplate = CS_DEFAULT_PROMPT;
+    return s;
 }
 
-/* 마법소녀 */
-.cs-overlay[data-theme="magical"] {
-    --cs-bg: #fef0f8;
-    --cs-header-bg: linear-gradient(135deg, #fdb4d8, #c9a5f7);
-    --cs-card-bg: #fff;
-    --cs-border: #f0d0e8;
-    --cs-text: #5a3060;
-    --cs-text-sub: #9070a0;
-    --cs-text-dim: #c0a0c8;
-    --cs-accent: #e060a0;
-    --cs-accent-gradient: linear-gradient(135deg, #f472b6, #c084fc);
-    --cs-accent-light: rgba(244, 114, 182, 0.15);
-    --cs-accent-border: rgba(244, 114, 182, 0.4);
-    --cs-accent-text: #d946a8;
-    --cs-input-bg: #fff8fc;
-    --cs-input-border: #f0d0e8;
-    --cs-input-focus: #e060a0;
-    --cs-btn-secondary-bg: #fce8f4;
-    --cs-btn-secondary-border: #f0d0e8;
-    --cs-btn-secondary-text: #805070;
-    --cs-success: #60c090;
-    --cs-warning-bg: rgba(250, 180, 80, 0.15);
-    --cs-warning-border: rgba(250, 180, 80, 0.4);
-    --cs-warning-text: #c07030;
-    --cs-error: #e04070;
-    --cs-shadow: 0 6px 24px rgba(200, 100, 180, 0.15);
-    --cs-radius: 16px;
-    --cs-font: 'Noto Sans KR', sans-serif;
-    --cs-font-mono: 'Noto Sans KR', monospace;
-    --cs-close-bg: #fce8f4;
-    --cs-close-border: #f0d0e8;
-    --cs-close-text: #805070;
-    --cs-meter-track: #f0d8e8;
-    --cs-copy-hover: rgba(244, 114, 182, 0.25);
-    --cs-section-hover: #fff4fa;
-    --cs-textarea-bg: #fff8fc;
+// ===== 컨텍스트 계산 =====
+function getContextInfo() {
+    const ctx = SillyTavern.getContext();
+    const isOpenai = ctx.mainApi === 'openai';
+    const maxCtxEl = document.getElementById(isOpenai ? 'openai_max_context' : 'max_context');
+    const maxTokEl = document.getElementById(isOpenai ? 'openai_max_tokens' : 'max_tokens');
+
+    const maxContext = parseInt(maxCtxEl?.value) || ctx.maxContext || 8192;
+    const reservedResponse = parseInt(maxTokEl?.value) || 0;
+    const available = maxContext - reservedResponse;
+
+    let chatTokens = 0;
+    for (const msg of ctx.chat) {
+        chatTokens += ctx.getTokenCount(msg.mes || '');
+    }
+
+    const usagePercent = available > 0 ? Math.round((chatTokens / available) * 100) : 0;
+
+    return { maxContext, reservedResponse, available, chatTokens, usagePercent, chatLength: ctx.chat.length };
 }
 
-/* 심플 */
-.cs-overlay[data-theme="simple"] {
-    --cs-bg: #ffffff;
-    --cs-header-bg: #fafafa;
-    --cs-card-bg: #f8f8f8;
-    --cs-border: #e0e0e0;
-    --cs-text: #1a1a1a;
-    --cs-text-sub: #888;
-    --cs-text-dim: #bbb;
-    --cs-accent: #333;
-    --cs-accent-gradient: linear-gradient(135deg, #444, #222);
-    --cs-accent-light: rgba(0, 0, 0, 0.05);
-    --cs-accent-border: rgba(0, 0, 0, 0.15);
-    --cs-accent-text: #333;
-    --cs-input-bg: #fff;
-    --cs-input-border: #ddd;
-    --cs-input-focus: #333;
-    --cs-btn-secondary-bg: #f0f0f0;
-    --cs-btn-secondary-border: #ddd;
-    --cs-btn-secondary-text: #444;
-    --cs-success: #22c55e;
-    --cs-warning-bg: rgba(250, 180, 50, 0.1);
-    --cs-warning-border: rgba(250, 180, 50, 0.3);
-    --cs-warning-text: #92600a;
-    --cs-error: #dc2626;
-    --cs-shadow: 0 4px 16px rgba(0,0,0,0.08);
-    --cs-radius: 10px;
-    --cs-font: 'Noto Sans KR', sans-serif;
-    --cs-font-mono: 'Noto Sans KR', monospace;
-    --cs-close-bg: #f0f0f0;
-    --cs-close-border: #ddd;
-    --cs-close-text: #444;
-    --cs-meter-track: #e8e8e8;
-    --cs-copy-hover: rgba(0, 0, 0, 0.08);
-    --cs-section-hover: #f4f4f4;
-    --cs-textarea-bg: #fff;
+// ===== 프로필 =====
+function getAvailableProfiles() {
+    try {
+        const CMRS = SillyTavern.getContext().ConnectionManagerRequestService;
+        if (!CMRS || typeof CMRS.getSupportedProfiles !== 'function') return [];
+        return CMRS.getSupportedProfiles() || [];
+    } catch (e) { return []; }
 }
 
-/* ── 오버레이 ────────────────────────────────── */
-.cs-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.6);
-    z-index: 999999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: visible;
+// ===== 프롬프트 =====
+function buildSummaryPrompt(settings) {
+    const ctx = SillyTavern.getContext();
+    let prompt = settings.promptTemplate || CS_DEFAULT_PROMPT;
+    prompt = prompt.replace(/\{\{char\}\}/gi, ctx.name2 || 'char');
+    prompt = prompt.replace(/\{\{user\}\}/gi, ctx.name1 || 'user');
+    return prompt;
 }
 
-/* ── 팝업 ────────────────────────────────────── */
-.cs-popup {
-    position: relative;
-    width: 92vw;
-    max-width: 600px;
-    height: 85vh;
-    background: var(--cs-bg);
-    border: 1px solid var(--cs-border);
-    border-radius: var(--cs-radius);
-    box-shadow: var(--cs-shadow);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    font-family: var(--cs-font);
-    color: var(--cs-text);
+// ===== 파싱 =====
+function parseSummaryResult(text) {
+    const summaryMatch = text.match(/<summary>([\s\S]*?)<\/summary>/i);
+    const raw = summaryMatch ? summaryMatch[1].trim() : text.trim();
+
+    const sections = { Main_Characters: '', Minor_Characters: '', Timeline: '', Locations: '', Lore: '' };
+    const names = Object.keys(sections);
+
+    for (let i = 0; i < names.length; i++) {
+        const name = names[i];
+        const regex = new RegExp(`^${name}[:\\s]*$`, 'im');
+        const match = raw.search(regex);
+        if (match === -1) continue;
+
+        let endIdx = raw.length;
+        for (let j = i + 1; j < names.length; j++) {
+            const nextRegex = new RegExp(`^${names[j]}[:\\s]*$`, 'im');
+            const nextMatch = raw.substring(match + name.length).search(nextRegex);
+            if (nextMatch !== -1) { endIdx = match + name.length + nextMatch; break; }
+        }
+
+        const content = raw.substring(match, endIdx).trim();
+        const headerEnd = content.indexOf('\n');
+        sections[name] = headerEnd !== -1 ? content.substring(headerEnd + 1).trim() : '';
+    }
+
+    return { raw, sections };
 }
 
-/* ── 헤더 ────────────────────────────────────── */
-.cs-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 14px 18px;
-    background: var(--cs-header-bg);
-    border-bottom: 1px solid var(--cs-border);
-    flex-shrink: 0;
-}
-.cs-header-title {
-    font-size: 15px;
-    font-weight: 700;
-}
-/* 레트로 헤더 흰색 텍스트 */
-[data-theme="retro"] .cs-header-title { color: #fff; font-size: 12px; }
-[data-theme="retro"] .cs-close-btn { font-family: 'Noto Sans KR', sans-serif; }
-/* 마법소녀 헤더 */
-[data-theme="magical"] .cs-header-title { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.2); }
-
-.cs-close-btn {
-    background: var(--cs-close-bg);
-    border: 1px solid var(--cs-close-border);
-    color: var(--cs-close-text);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--cs-font);
-}
-.cs-close-btn:hover { opacity: 0.8; }
-
-/* 레트로 버튼 스타일 오버라이드 */
-[data-theme="retro"] .cs-popup {
-    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff, 2px 2px 0 #000;
-}
-[data-theme="retro"] .cs-close-btn {
-    border-radius: 0;
-    box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff;
-}
-[data-theme="retro"] .cs-close-btn:active {
-    box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff;
+// ===== 유틸 =====
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
-/* ── 컨텐츠 ──────────────────────────────────── */
-.cs-content {
-    flex: 1;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
-    overscroll-behavior: contain;
-    min-height: 0;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
+async function copyToClipboard(text, btn) {
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch (e) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+    const orig = btn.textContent;
+    btn.textContent = '복사됨!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
 }
 
-/* ── 컨텍스트 미터 ───────────────────────────── */
-.cs-context-meter {
-    background: var(--cs-card-bg);
-    border-radius: var(--cs-radius);
-    padding: 14px;
-    border: 1px solid var(--cs-border);
-}
-.cs-meter-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-}
-.cs-meter-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
-.cs-meter-value { font-size: 12px; font-weight: 700; color: var(--cs-text); }
-.cs-meter-bar {
-    width: 100%;
-    height: 8px;
-    background: var(--cs-meter-track);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.cs-meter-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
-.cs-meter-fill.safe { background: linear-gradient(90deg, #4ade80, #22c55e); }
-.cs-meter-fill.warning { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
-.cs-meter-fill.danger { background: linear-gradient(90deg, #f87171, #ef4444); }
-.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--cs-text-dim); }
+// ===== 경고 팝업 =====
+function showContextWarning(info) {
+    document.querySelector('.cs-alert-overlay')?.remove();
 
-/* 레트로 미터 */
-[data-theme="retro"] .cs-meter-bar { border-radius: 0; border: 1px inset #808080; }
-[data-theme="retro"] .cs-meter-fill { border-radius: 0; }
+    const settings = getCsSettings();
+    const overlay = document.createElement('div');
+    overlay.className = 'cs-alert-overlay';
+    overlay.setAttribute('data-theme', settings.theme);
+    overlay.innerHTML = `
+        <div class="cs-alert-box">
+            <div class="cs-alert-icon">⚠️</div>
+            <div class="cs-alert-title">컨텍스트 경고</div>
+            <div class="cs-alert-msg">
+                현재 채팅 토큰(${info.chatTokens.toLocaleString()})이<br>
+                가용 컨텍스트(${info.available.toLocaleString()})의 ${info.usagePercent}%를 사용 중입니다.<br><br>
+                다음 응답부터 오래된 메시지가 잘릴 수 있습니다.<br>
+                요약을 권장합니다!
+            </div>
+            <div class="cs-alert-buttons">
+                <button class="cs-alert-ok">확인</button>
+            </div>
+        </div>`;
 
-/* ── 경고 배너 ───────────────────────────────── */
-.cs-warning-banner {
-    background: var(--cs-warning-bg);
-    border: 1px solid var(--cs-warning-border);
-    border-radius: var(--cs-radius);
-    padding: 12px 14px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-    color: var(--cs-warning-text);
-}
-.cs-warning-icon { font-size: 18px; flex-shrink: 0; }
-
-/* ── 프로필/프롬프트 섹션 ────────────────────── */
-.cs-profile-section, .cs-prompt-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.cs-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
-.cs-select {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--cs-input-border);
-    border-radius: var(--cs-radius);
-    background: var(--cs-input-bg);
-    font-family: var(--cs-font);
-    font-size: 13px;
-    color: var(--cs-text);
-    cursor: pointer;
-}
-[data-theme="retro"] .cs-select { border-radius: 0; font-family: 'Noto Sans KR', sans-serif; font-size: 12px; }
-
-.cs-prompt-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    cursor: pointer;
-}
-.cs-prompt-toggle-icon { font-size: 11px; color: var(--cs-text-dim); transition: transform 0.2s; }
-.cs-prompt-toggle-icon.open { transform: rotate(90deg); }
-
-.cs-textarea {
-    width: 100%;
-    min-height: 200px;
-    border: 1px solid var(--cs-input-border);
-    border-radius: var(--cs-radius);
-    background: var(--cs-input-bg);
-    font-family: var(--cs-font-mono);
-    font-size: 12px;
-    line-height: 1.6;
-    color: var(--cs-text);
-    padding: 12px;
-    resize: vertical;
-    box-sizing: border-box;
-}
-.cs-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
-[data-theme="retro"] .cs-textarea { border-radius: 0; font-family: 'Noto Sans KR', monospace; }
-
-/* ── 생성 버튼 ───────────────────────────────── */
-.cs-generate-btn {
-    width: 100%;
-    padding: 12px;
-    background: var(--cs-accent-gradient);
-    color: #fff;
-    border: none;
-    border-radius: var(--cs-radius);
-    font-family: var(--cs-font);
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-.cs-generate-btn:hover { opacity: 0.9; }
-.cs-generate-btn:active { transform: scale(0.98); }
-.cs-generate-btn:disabled { background: #555; cursor: not-allowed; }
-
-[data-theme="retro"] .cs-generate-btn {
-    border-radius: 0;
-    background: #c0c0c0;
-    color: #000;
-    border: 2px outset #dfdfdf;
-    font-family: 'Noto Sans KR', sans-serif;
-}
-[data-theme="retro"] .cs-generate-btn:active {
-    border-style: inset;
+    document.body.appendChild(overlay);
+    overlay.querySelector('.cs-alert-ok').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-/* ── 로딩 ────────────────────────────────────── */
-.cs-loading {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    padding: 40px 20px;
-    color: var(--cs-text-sub);
-    font-size: 14px;
-}
-.cs-spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--cs-border);
-    border-top-color: var(--cs-accent);
-    border-radius: 50%;
-    animation: cs-spin 0.8s linear infinite;
-}
-@keyframes cs-spin { to { transform: rotate(360deg); } }
-[data-theme="retro"] .cs-spinner { border-radius: 0; }
-[data-theme="retro"] .cs-loading { font-family: 'Noto Sans KR', sans-serif; }
+// ===== 메인 팝업 =====
+function showSummarizerPopup() {
+    // 숨겨진 팝업 있으면 다시 보여주기
+    const existing = document.querySelector('.cs-overlay');
+    if (existing) {
+        existing.style.display = 'flex';
+        return;
+    }
 
-/* ── 결과 섹션 ───────────────────────────────── */
-.cs-result-section {
-    background: var(--cs-card-bg);
-    border: 1px solid var(--cs-border);
-    border-radius: var(--cs-radius);
-    overflow: hidden;
-}
-.cs-result-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 14px;
-    cursor: pointer;
-    user-select: none;
-}
-.cs-result-header:hover { background: var(--cs-section-hover); }
-.cs-result-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--cs-accent-text);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.cs-result-actions { display: flex; gap: 6px; }
-.cs-copy-btn {
-    padding: 4px 10px;
-    background: var(--cs-accent-light);
-    border: 1px solid var(--cs-accent-border);
-    border-radius: 6px;
-    color: var(--cs-accent-text);
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--cs-font);
-    transition: all 0.15s;
-}
-.cs-copy-btn:hover { background: var(--cs-copy-hover); }
-.cs-copy-btn.copied {
-    background: rgba(74, 222, 128, 0.2);
-    border-color: rgba(74, 222, 128, 0.4);
-    color: var(--cs-success);
-}
-[data-theme="retro"] .cs-copy-btn { border-radius: 0; box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff; }
+    const settings = getCsSettings();
+    const profiles = getAvailableProfiles();
+    const info = getContextInfo();
 
-.cs-result-body {
-    padding: 14px;
-    display: none;
-}
-.cs-result-body.open { display: block; }
+    const overlay = document.createElement('div');
+    overlay.className = 'cs-overlay';
+    overlay.setAttribute('data-theme', settings.theme);
 
-/* ── 결과 편집 textarea ──────────────────────── */
-.cs-result-textarea {
-    width: 100%;
-    background: var(--cs-textarea-bg);
-    border: 1px solid var(--cs-input-border);
-    border-radius: 6px;
-    color: var(--cs-text);
-    font-family: var(--cs-font-mono);
-    font-size: 12.5px;
-    line-height: 1.7;
-    padding: 10px;
-    resize: vertical;
-    box-sizing: border-box;
-    white-space: pre-wrap;
-    word-break: break-word;
-}
-.cs-result-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
-[data-theme="retro"] .cs-result-textarea { border-radius: 0; font-family: 'Noto Sans KR', monospace; }
+    const popup = document.createElement('div');
+    popup.className = 'cs-popup';
 
-/* ── 전체 복사 ───────────────────────────────── */
-.cs-copy-all-btn {
-    width: 100%;
-    padding: 10px;
-    background: var(--cs-accent-light);
-    border: 1px solid var(--cs-accent-border);
-    border-radius: var(--cs-radius);
-    color: var(--cs-accent-text);
-    font-family: var(--cs-font);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.15s;
-}
-.cs-copy-all-btn:hover { background: var(--cs-copy-hover); }
+    // 헤더
+    const header = document.createElement('div');
+    header.className = 'cs-header';
+    header.innerHTML = '<span class="cs-header-title">📝 채팅 요약</span>';
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'cs-close-btn';
+    closeBtn.textContent = '✕';
+    closeBtn.addEventListener('click', () => overlay.style.display = 'none');
+    header.appendChild(closeBtn);
 
-/* ── 보조 버튼 ───────────────────────────────── */
-.cs-retry-btn {
-    width: 100%;
-    padding: 10px;
-    background: var(--cs-btn-secondary-bg);
-    border: 1px solid var(--cs-btn-secondary-border);
-    border-radius: var(--cs-radius);
-    color: var(--cs-btn-secondary-text);
-    font-family: var(--cs-font);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-}
-[data-theme="retro"] .cs-retry-btn { border-radius: 0; box-shadow: inset -1px -1px 0 #808080, inset 1px 1px 0 #fff; }
+    // 컨텐츠
+    const content = document.createElement('div');
+    content.className = 'cs-content';
 
-/* ── 에러 ────────────────────────────────────── */
-.cs-error { padding: 20px; text-align: center; color: var(--cs-error); font-size: 13px; font-weight: 700; }
+    popup.appendChild(header);
+    popup.appendChild(content);
+    overlay.appendChild(popup);
 
-/* ── 경고 팝업 ───────────────────────────────── */
-.cs-alert-overlay {
-    position: fixed;
-    top: 0; left: 0;
-    width: 100vw; height: 100vh;
-    background: rgba(0,0,0,0.5);
-    z-index: 9999999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-.cs-alert-box {
-    width: 90vw;
-    max-width: 400px;
-    background: var(--cs-bg, #1a1a2e);
-    border: 1px solid var(--cs-error, #f87171);
-    border-radius: var(--cs-radius, 12px);
-    padding: 24px;
-    text-align: center;
-    font-family: var(--cs-font, 'Noto Sans KR', sans-serif);
-    color: var(--cs-text, #e0e0e0);
-}
-.cs-alert-icon { font-size: 32px; margin-bottom: 12px; }
-.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 8px; }
-.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 18px; }
-.cs-alert-ok {
-    padding: 8px 24px;
-    background: var(--cs-accent-gradient);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    font-family: var(--cs-font);
+    // 바깥 클릭 = 숨기기
+    overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) overlay.style.display = 'none';
+    });
+
+    // ESC = 숨기기
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && overlay.style.display !== 'none') {
+            overlay.style.display = 'none';
+        }
+    });
+
+    document.body.appendChild(overlay);
+
+    // 메인 화면 표시
+    showMainView(content, settings, profiles, info, overlay);
 }
 
-/* ── 모바일 ──────────────────────────────────── */
-@media (max-width: 480px) {
-    .cs-popup { width: 96vw; height: 90vh; }
-    .cs-content { padding: 12px; }
-    .cs-textarea { min-height: 150px; font-size: 11px; }
-    [data-theme="retro"] .cs-header-title { font-size: 10px; }
+// ===== 메인 화면 (프로필 선택 + 생성 버튼) =====
+function showMainView(content, settings, profiles, info, overlay) {
+    const fillClass = info.usagePercent >= 90 ? 'danger' : info.usagePercent >= 70 ? 'warning' : 'safe';
+    const fillWidth = Math.min(info.usagePercent, 100);
+
+    let profileOpts = '<option value="">기본 (현재 연결)</option>';
+    profiles.forEach(p => {
+        const sel = settings.profileId === p.id ? 'selected' : '';
+        const model = p.model ? ` (${p.model})` : '';
+        profileOpts += `<option value="${p.id}" ${sel}>${escapeHtml(p.name)}${escapeHtml(model)}</option>`;
+    });
+
+    let warningHtml = '';
+    if (info.usagePercent >= 85) {
+        warningHtml = `
+            <div class="cs-warning-banner">
+                <span class="cs-warning-icon">⚠️</span>
+                <span>컨텍스트 사용량이 ${info.usagePercent}%입니다. 요약을 권장합니다!</span>
+            </div>`;
+    }
+
+    content.innerHTML = `
+        <div class="cs-context-meter">
+            <div class="cs-meter-header">
+                <span class="cs-meter-label">컨텍스트 사용량</span>
+                <span class="cs-meter-value">${info.usagePercent}%</span>
+            </div>
+            <div class="cs-meter-bar">
+                <div class="cs-meter-fill ${fillClass}" style="width:${fillWidth}%"></div>
+            </div>
+            <div class="cs-meter-detail">
+                <span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span>
+                <span>가용: ${info.available.toLocaleString()} 토큰</span>
+            </div>
+        </div>
+        ${warningHtml}
+        <div class="cs-profile-section">
+            <label class="cs-label">연결 프로필</label>
+            <select class="cs-select" id="cs-profile-select">${profileOpts}</select>
+        </div>
+        <div class="cs-prompt-section">
+            <div class="cs-prompt-toggle" id="cs-prompt-toggle">
+                <span class="cs-label">요약 프롬프트</span>
+                <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
+            </div>
+            <textarea class="cs-textarea" id="cs-prompt-area" style="display:none;">${escapeHtml(settings.promptTemplate)}</textarea>
+        </div>
+        <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
+
+    // 프로필 변경
+    content.querySelector('#cs-profile-select').addEventListener('change', function () {
+        settings.profileId = this.value;
+        SillyTavern.getContext().saveSettingsDebounced();
+    });
+
+    // 프롬프트 토글
+    const toggleBtn = content.querySelector('#cs-prompt-toggle');
+    const toggleIcon = content.querySelector('#cs-toggle-icon');
+    const promptArea = content.querySelector('#cs-prompt-area');
+    toggleBtn.addEventListener('click', () => {
+        const visible = promptArea.style.display !== 'none';
+        promptArea.style.display = visible ? 'none' : 'block';
+        toggleIcon.textContent = visible ? '▶' : '▼';
+        toggleIcon.classList.toggle('open', !visible);
+    });
+
+    // 프롬프트 저장
+    promptArea.addEventListener('input', function () {
+        settings.promptTemplate = this.value;
+        SillyTavern.getContext().saveSettingsDebounced();
+    });
+
+    // 생성 버튼
+    content.querySelector('#cs-generate-btn').addEventListener('click', () => {
+        settings.profileId = content.querySelector('#cs-profile-select').value;
+        SillyTavern.getContext().saveSettingsDebounced();
+        content.innerHTML = `
+            <div class="cs-loading">
+                <div class="cs-spinner"></div>
+                <span>요약 생성 중... 시간이 좀 걸릴 수 있어요</span>
+            </div>`;
+        generateSummary(content, settings, profiles, overlay);
+    });
 }
+
+// ===== 요약 생성 =====
+async function generateSummary(content, settings, profiles, overlay) {
+    const ctx = SillyTavern.getContext();
+    const prompt = buildSummaryPrompt(settings);
+
+    try {
+        let result;
+
+        if (settings.profileId) {
+            const CMRS = ctx.ConnectionManagerRequestService;
+            const messages = [
+                { role: 'system', content: 'You are a helpful assistant that summarizes roleplay chat logs into structured YAML format.' },
+                { role: 'user', content: prompt },
+            ];
+            const response = await CMRS.sendRequest(settings.profileId, messages, 16000, {
+                stream: false, signal: null, extractData: true, includePreset: false, includeInstruct: false,
+            });
+
+            if (typeof response === 'string') result = response;
+            else if (response?.choices?.[0]?.message?.content) result = response.choices[0].message.content;
+            else if (response?.content) result = response.content;
+            else if (response?.text) result = response.text;
+            else result = String(response);
+        } else {
+            result = await ctx.generateQuietPrompt({
+                quietPrompt: prompt, skipWIAN: true, removeReasoning: true,
+            });
+        }
+
+        if (!result || !result.trim()) {
+            showError(content, '응답이 비어있습니다.', settings, profiles, overlay);
+            return;
+        }
+
+        const parsed = parseSummaryResult(result);
+        showResult(content, parsed, settings, profiles, overlay);
+    } catch (err) {
+        console.error('[Chat Summarizer] Error:', err);
+        showError(content, err.message || '알 수 없는 오류', settings, profiles, overlay);
+    }
+}
+
+// ===== 에러 =====
+function showError(content, msg, settings, profiles, overlay) {
+    content.innerHTML = `
+        <div class="cs-error">에러: ${escapeHtml(msg)}</div>
+        <button class="cs-retry-btn" id="cs-retry">↻ 돌아가기</button>`;
+    content.querySelector('#cs-retry').addEventListener('click', () => {
+        showMainView(content, settings, profiles, getContextInfo(), overlay);
+    });
+}
+
+// ===== 결과 =====
+function showResult(content, parsed, settings, profiles, overlay) {
+    const sectionLabels = {
+        Main_Characters: '👤 주요 인물',
+        Minor_Characters: '👥 보조 인물',
+        Timeline: '📅 타임라인',
+        Locations: '📍 장소',
+        Lore: '📖 로어',
+    };
+
+    let sectionsHtml = '';
+    for (const [key, label] of Object.entries(sectionLabels)) {
+        const text = parsed.sections[key] || '';
+        const has = text.trim().length > 0;
+        const lines = Math.max(3, text.split('\n').length + 2);
+
+        sectionsHtml += `
+            <div class="cs-result-section" data-section="${key}">
+                <div class="cs-result-header">
+                    <div class="cs-result-title">
+                        <span>${label}</span>
+                        ${has ? '' : '<span style="font-size:11px;color:var(--cs-text-dim);">(비어있음)</span>'}
+                    </div>
+                    <div class="cs-result-actions">
+                        <button class="cs-copy-btn" data-copy-section="${key}">복사</button>
+                    </div>
+                </div>
+                <div class="cs-result-body">
+                    <textarea class="cs-result-textarea" data-section="${key}" rows="${lines}">${escapeHtml(text)}</textarea>
+                </div>
+            </div>`;
+    }
+
+    content.innerHTML = `
+        <div class="cs-context-meter" style="padding:10px 14px;">
+            <div class="cs-meter-header" style="margin-bottom:0;">
+                <span class="cs-meter-label">요약 완료</span>
+                <span class="cs-meter-value" style="color:var(--cs-success);">✓</span>
+            </div>
+        </div>
+        ${sectionsHtml}
+        <button class="cs-copy-all-btn" id="cs-copy-all">📋 전체 복사</button>
+        <div style="display:flex;gap:10px;">
+            <button class="cs-retry-btn" id="cs-regenerate" style="flex:1;">↻ 다시 생성</button>
+            <button class="cs-retry-btn" id="cs-back" style="flex:1;">← 돌아가기</button>
+            <button class="cs-retry-btn" id="cs-reset" style="flex:0.8;color:var(--cs-error);">✕ 초기화</button>
+        </div>`;
+
+    // 섹션 토글
+    content.querySelectorAll('.cs-result-header').forEach(header => {
+        header.addEventListener('click', (e) => {
+            if (e.target.classList.contains('cs-copy-btn')) return;
+            header.nextElementSibling.classList.toggle('open');
+        });
+    });
+
+    // 섹션 복사
+    content.querySelectorAll('.cs-copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const key = btn.dataset.copySection;
+            const ta = content.querySelector(`.cs-result-textarea[data-section="${key}"]`);
+            copyToClipboard(ta ? ta.value : '', btn);
+        });
+    });
+
+    // 전체 복사
+    content.querySelector('#cs-copy-all').addEventListener('click', function () {
+        let full = '';
+        content.querySelectorAll('.cs-result-textarea').forEach(ta => {
+            if (ta.value.trim()) full += `${ta.dataset.section}:\n${ta.value.trim()}\n\n`;
+        });
+        copyToClipboard(full.trim(), this);
+    });
+
+    // 다시 생성
+    content.querySelector('#cs-regenerate').addEventListener('click', () => {
+        content.innerHTML = `<div class="cs-loading"><div class="cs-spinner"></div><span>요약 생성 중...</span></div>`;
+        generateSummary(content, settings, profiles, overlay);
+    });
+
+    // 돌아가기
+    content.querySelector('#cs-back').addEventListener('click', () => {
+        showMainView(content, settings, profiles, getContextInfo(), overlay);
+    });
+
+    // 초기화 (팝업 완전 삭제)
+    content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
+}
+
+// ===== 컨텍스트 체크 =====
+function checkContextWarning() {
+    const settings = getCsSettings();
+    if (!settings.warnEnabled) return;
+    const info = getContextInfo();
+    if (info.usagePercent >= settings.warnThreshold) showContextWarning(info);
+}
+
+// ===== 설정 UI =====
+function loadCsSettingsUI() {
+    const settings = getCsSettings();
+
+    let themeOpts = '';
+    for (const [key, label] of Object.entries(CS_THEMES)) {
+        themeOpts += `<option value="${key}" ${settings.theme === key ? 'selected' : ''}>${label}</option>`;
+    }
+
+    const html = `
+    <div id="chat-summarizer-settings">
+        <div class="inline-drawer">
+            <div class="inline-drawer-toggle inline-drawer-header">
+                <b>📝 Chat Summarizer</b>
+                <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+            </div>
+            <div class="inline-drawer-content">
+                <div class="cb-setting-row">
+                    <label for="cs_theme">팝업 테마</label>
+                    <select id="cs_theme" class="text_pole" style="width:180px;">${themeOpts}</select>
+                </div>
+                <div class="cb-setting-row">
+                    <label for="cs_warn_enabled">컨텍스트 경고 팝업</label>
+                    <input id="cs_warn_enabled" type="checkbox" ${settings.warnEnabled ? 'checked' : ''} />
+                </div>
+                <div class="cb-setting-row">
+                    <label for="cs_warn_threshold">경고 기준 (%)</label>
+                    <input id="cs_warn_threshold" type="number" class="text_pole" min="50" max="100" value="${settings.warnThreshold}" style="width:80px;" />
+                </div>
+                <small style="color:#888;display:block;margin-top:6px;">
+                    채팅 토큰이 가용 컨텍스트의 해당 %를 넘으면 경고가 뜹니다.
+                </small>
+            </div>
+        </div>
+    </div>`;
+
+    $('#extensions_settings2').append(html);
+
+    const save = SillyTavern.getContext().saveSettingsDebounced;
+
+    $('#cs_theme').on('change', function () {
+        settings.theme = $(this).val();
+        save();
+        const ol = document.querySelector('.cs-overlay');
+        if (ol) ol.setAttribute('data-theme', settings.theme);
+    });
+
+    $('#cs_warn_enabled').on('change', function () {
+        settings.warnEnabled = !!$(this).prop('checked');
+        save();
+    });
+
+    $('#cs_warn_threshold').on('input', function () {
+        settings.warnThreshold = parseInt($(this).val(), 10) || 85;
+        save();
+    });
+}
+
+// ===== 메인 버튼 =====
+function addCsButton() {
+    document.getElementById('chat-summarizer-btn')?.remove();
+
+    const btn = document.createElement('div');
+    btn.id = 'chat-summarizer-btn';
+    btn.textContent = '📝';
+    btn.title = '채팅 요약';
+    btn.style.cssText = 'cursor:pointer;font-size:1.2em;padding:3px 5px;border-radius:5px;transition:background 0.2s;z-index:9999;';
+    btn.addEventListener('click', () => {
+        const ctx = SillyTavern.getContext();
+        if (!ctx.chat || ctx.chat.length === 0) {
+            toastr.warning('채팅이 없습니다!');
+            return;
+        }
+        showSummarizerPopup();
+    });
+
+    const wrapper = document.getElementById('cb-btn-wrapper');
+    if (wrapper) {
+        wrapper.appendChild(btn);
+    } else {
+        const newWrapper = document.createElement('div');
+        newWrapper.id = 'cb-btn-wrapper';
+        newWrapper.style.cssText = 'display:flex;flex-direction:row;gap:4px;align-self:flex-start;';
+        newWrapper.appendChild(btn);
+        const sendForm = document.getElementById('send_form');
+        if (sendForm && sendForm.firstChild) sendForm.insertBefore(newWrapper, sendForm.firstChild);
+        else if (sendForm) sendForm.appendChild(newWrapper);
+    }
+    console.log('[Chat Summarizer] Button added');
+}
+
+// ===== Init =====
+(function init() {
+    const ctx = SillyTavern.getContext();
+    loadCsSettingsUI();
+    setTimeout(addCsButton, 1500);
+
+    ctx.eventSource.on(ctx.eventTypes.CHARACTER_MESSAGE_RENDERED, () => {
+        setTimeout(checkContextWarning, 500);
+    });
+
+    console.log('[Chat Summarizer] Extension loaded!');
+})();
