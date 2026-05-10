@@ -82,6 +82,7 @@ Lore:
 
 > If an earlier summary exists, append only new events and changed entries. Return the complete merged YAML inside <summary></summary> tags only—no commentary outside the tags.`;
 
+// ===== 설정 =====
 function getCsSettings() {
     const ctx = SillyTavern.getContext();
     if (!ctx.extensionSettings[CS_MODULE]) {
@@ -217,6 +218,7 @@ function showContextWarning(info) {
 
 // ===== 메인 팝업 =====
 function showSummarizerPopup() {
+    // 숨겨진 팝업 있으면 다시 보여주기
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
         existing.style.display = 'flex';
@@ -234,6 +236,7 @@ function showSummarizerPopup() {
     const popup = document.createElement('div');
     popup.className = 'cs-popup';
 
+    // 헤더
     const header = document.createElement('div');
     header.className = 'cs-header';
     header.innerHTML = '<span class="cs-header-title">📝 채팅 요약</span>';
@@ -243,6 +246,7 @@ function showSummarizerPopup() {
     closeBtn.addEventListener('click', () => overlay.style.display = 'none');
     header.appendChild(closeBtn);
 
+    // 컨텐츠
     const content = document.createElement('div');
     content.className = 'cs-content';
 
@@ -250,22 +254,25 @@ function showSummarizerPopup() {
     popup.appendChild(content);
     overlay.appendChild(popup);
 
+    // 바깥 클릭 = 숨기기
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.style.display = 'none';
     });
 
-    const escHandler = (e) => {
+    // ESC = 숨기기
+    document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && overlay.style.display !== 'none') {
             overlay.style.display = 'none';
         }
-    };
-    document.addEventListener('keydown', escHandler);
+    });
 
     document.body.appendChild(overlay);
+
+    // 메인 화면 표시
     showMainView(content, settings, profiles, info, overlay);
 }
 
-// ===== 메인 화면 =====
+// ===== 메인 화면 (프로필 선택 + 생성 버튼) =====
 function showMainView(content, settings, profiles, info, overlay) {
     const fillClass = info.usagePercent >= 90 ? 'danger' : info.usagePercent >= 70 ? 'warning' : 'safe';
     const fillWidth = Math.min(info.usagePercent, 100);
@@ -314,11 +321,13 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
+    // 프로필 변경
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
+    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
@@ -329,11 +338,13 @@ function showMainView(content, settings, profiles, info, overlay) {
         toggleIcon.classList.toggle('open', !visible);
     });
 
+    // 프롬프트 저장
     promptArea.addEventListener('input', function () {
         settings.promptTemplate = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
+    // 생성 버튼
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -484,7 +495,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
     });
 
-    // 초기화
+    // 초기화 (팝업 완전 삭제)
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
@@ -539,9 +550,8 @@ function loadCsSettingsUI() {
     $('#cs_theme').on('change', function () {
         settings.theme = $(this).val();
         save();
-        // 열려있는 팝업 테마도 즉시 변경
-        const overlay = document.querySelector('.cs-overlay');
-        if (overlay) overlay.setAttribute('data-theme', settings.theme);
+        const ol = document.querySelector('.cs-overlay');
+        if (ol) ol.setAttribute('data-theme', settings.theme);
     });
 
     $('#cs_warn_enabled').on('change', function () {
