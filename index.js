@@ -1,10 +1,9 @@
 const CS_MODULE = 'chat_summarizer';
 
 const CS_THEMES = {
-    cyber:   '🔮 사이버펑크',
-    retro:   '🖥️ 레트로 PC',
+    dark:    '🌙 다크 모드',
+    retro:   '🖥️ 레트로 Y2K',
     romance: '🌸 로판',
-    magical: '⭐ 마법소녀',
     simple:  '📄 심플',
 };
 
@@ -13,7 +12,7 @@ const CS_DEFAULTS = Object.freeze({
     warnEnabled: true,
     warnThreshold: 85,
     promptTemplate: '',
-    theme: 'cyber',
+    theme: 'dark',
 });
 
 const CS_DEFAULT_PROMPT = `[Pause the roleplay. You are the Game Master—an entity responsible for tracking all events, characters, and world details. Your task is to write a detailed report of the roleplay so far to keep the story focused and internally consistent. Deep-analyze today's entire chat history, world info, and character interactions, then produce a summary without continuing the roleplay. Output YAML only, wrapped in <summary></summary> tags.]
@@ -93,6 +92,10 @@ function getCsSettings() {
         if (!Object.hasOwn(s, key)) s[key] = CS_DEFAULTS[key];
     }
     if (!s.promptTemplate) s.promptTemplate = CS_DEFAULT_PROMPT;
+
+    // 기존 'cyber' 테마를 'dark'로 마이그레이션
+    if (s.theme === 'cyber') s.theme = 'dark';
+
     return s;
 }
 
@@ -108,13 +111,26 @@ function getContextInfo() {
     const available = maxContext - reservedResponse;
 
     let chatTokens = 0;
+    let summarizedTokens = 0;
+    let summarizedCount = 0;
+
     for (const msg of ctx.chat) {
-        chatTokens += ctx.getTokenCount(msg.mes || '');
+        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+        if (msg.extra?.cs_summarized) {
+            summarizedTokens += tokens;
+            summarizedCount++;
+        } else {
+            chatTokens += tokens;
+        }
     }
 
     const usagePercent = available > 0 ? Math.round((chatTokens / available) * 100) : 0;
 
-    return { maxContext, reservedResponse, available, chatTokens, usagePercent, chatLength: ctx.chat.length };
+    return {
+        maxContext, reservedResponse, available,
+        chatTokens, summarizedTokens, summarizedCount,
+        usagePercent, chatLength: ctx.chat.length
+    };
 }
 
 // ===== 프로필 =====
@@ -188,6 +204,20 @@ async function copyToClipboard(text, btn) {
     setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
 }
 
+// ===== 요약 완료 라벨링 =====
+async function markAsSummarized(startIdx, endIdx) {
+    const ctx = SillyTavern.getContext();
+    let count = 0;
+    for (let i = startIdx; i <= endIdx && i < ctx.chat.length; i++) {
+        ctx.chat[i].extra = ctx.chat[i].extra || {};
+        ctx.chat[i].extra.cs_summarized = true;
+        count++;
+    }
+    await ctx.saveChat();
+    console.log(`[Chat Summarizer] Marked messages ${startIdx}~${endIdx} as summarized (${count} msgs)`);
+    return count;
+}
+
 // ===== 경고 팝업 =====
 function showContextWarning(info) {
     document.querySelector('.cs-alert-overlay')?.remove();
@@ -208,17 +238,21 @@ function showContextWarning(info) {
             </div>
             <div class="cs-alert-buttons">
                 <button class="cs-alert-ok">확인</button>
+                <button class="cs-alert-summarize">📝 요약하기</button>
             </div>
         </div>`;
 
     document.body.appendChild(overlay);
     overlay.querySelector('.cs-alert-ok').addEventListener('click', () => overlay.remove());
+    overlay.querySelector('.cs-alert-summarize').addEventListener('click', () => {
+        overlay.remove();
+        showSummarizerPopup();
+    });
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
 // ===== 메인 팝업 =====
 function showSummarizerPopup() {
-    // 숨겨진 팝업 있으면 다시 보여주기
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
         existing.style.display = 'flex';
@@ -236,7 +270,14 @@ function showSummarizerPopup() {
     const popup = document.createElement('div');
     popup.className = 'cs-popup';
 
-    // 헤더
+    // 로판 코너 장식
+    ['romance-corner-tr', 'romance-corner-bl', 'romance-corner-br'].forEach(cls => {
+        const span = document.createElement('span');
+        span.className = cls;
+        span.textContent = '❦';
+        popup.appendChild(span);
+    });
+
     const header = document.createElement('div');
     header.className = 'cs-header';
     header.innerHTML = '<span class="cs-header-title">📝 채팅 요약</span>';
@@ -246,7 +287,6 @@ function showSummarizerPopup() {
     closeBtn.addEventListener('click', () => overlay.style.display = 'none');
     header.appendChild(closeBtn);
 
-    // 컨텐츠
     const content = document.createElement('div');
     content.className = 'cs-content';
 
@@ -254,25 +294,18 @@ function showSummarizerPopup() {
     popup.appendChild(content);
     overlay.appendChild(popup);
 
-    // 바깥 클릭 = 숨기기
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.style.display = 'none';
     });
-
-    // ESC = 숨기기
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && overlay.style.display !== 'none') {
-            overlay.style.display = 'none';
-        }
+        if (e.key === 'Escape' && overlay.style.display !== 'none') overlay.style.display = 'none';
     });
 
     document.body.appendChild(overlay);
-
-    // 메인 화면 표시
     showMainView(content, settings, profiles, info, overlay);
 }
 
-// ===== 메인 화면 (프로필 선택 + 생성 버튼) =====
+// ===== 메인 화면 =====
 function showMainView(content, settings, profiles, info, overlay) {
     const fillClass = info.usagePercent >= 90 ? 'danger' : info.usagePercent >= 70 ? 'warning' : 'safe';
     const fillWidth = Math.min(info.usagePercent, 100);
@@ -293,6 +326,11 @@ function showMainView(content, settings, profiles, info, overlay) {
             </div>`;
     }
 
+    let summarizedHtml = '';
+    if (info.summarizedCount > 0) {
+        summarizedHtml = `<div class="cs-summarized-info">✓ ${info.summarizedCount}개 메시지 요약 완료 (${info.summarizedTokens.toLocaleString()} 토큰 제외됨)</div>`;
+    }
+
     content.innerHTML = `
         <div class="cs-context-meter">
             <div class="cs-meter-header">
@@ -306,6 +344,7 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span>
                 <span>가용: ${info.available.toLocaleString()} 토큰</span>
             </div>
+            ${summarizedHtml}
         </div>
         ${warningHtml}
         <div class="cs-profile-section">
@@ -321,13 +360,11 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
-    // 프로필 변경
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
@@ -338,13 +375,11 @@ function showMainView(content, settings, profiles, info, overlay) {
         toggleIcon.classList.toggle('open', !visible);
     });
 
-    // 프롬프트 저장
     promptArea.addEventListener('input', function () {
         settings.promptTemplate = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // 생성 버튼
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -411,6 +446,7 @@ function showError(content, msg, settings, profiles, overlay) {
 
 // ===== 결과 =====
 function showResult(content, parsed, settings, profiles, overlay) {
+    const ctx = SillyTavern.getContext();
     const sectionLabels = {
         Main_Characters: '👤 주요 인물',
         Minor_Characters: '👥 보조 인물',
@@ -442,6 +478,14 @@ function showResult(content, parsed, settings, profiles, overlay) {
             </div>`;
     }
 
+    // 요약 완료 마킹할 범위 계산
+    // 이미 요약된 메시지 다음부터 ~ 마지막 메시지까지를 기본값으로
+    let defaultStart = 0;
+    for (let i = 0; i < ctx.chat.length; i++) {
+        if (ctx.chat[i].extra?.cs_summarized) defaultStart = i + 1;
+    }
+    const defaultEnd = Math.max(0, ctx.chat.length - 1);
+
     content.innerHTML = `
         <div class="cs-context-meter" style="padding:10px 14px;">
             <div class="cs-meter-header" style="margin-bottom:0;">
@@ -451,6 +495,20 @@ function showResult(content, parsed, settings, profiles, overlay) {
         </div>
         ${sectionsHtml}
         <button class="cs-copy-all-btn" id="cs-copy-all">📋 전체 복사</button>
+        <div class="cs-range-section">
+            <div class="cs-range-header">📌 요약 완료 표시 (게이지에서 제외)</div>
+            <div class="cs-range-inputs">
+                <span class="cs-label">메시지</span>
+                <input type="number" class="cs-range-input" id="cs-mark-start" value="${defaultStart}" min="0" max="${ctx.chat.length - 1}">
+                <span class="cs-range-sep">~</span>
+                <input type="number" class="cs-range-input" id="cs-mark-end" value="${defaultEnd}" min="0" max="${ctx.chat.length - 1}">
+                <span class="cs-label">번</span>
+            </div>
+            <div class="cs-range-info">
+                총 ${ctx.chat.length}개 메시지 (이미 요약됨: ${defaultStart}개)
+            </div>
+            <button class="cs-mark-btn" id="cs-mark-btn" style="margin-top:10px;">✓ 요약 완료로 표시</button>
+        </div>
         <div style="display:flex;gap:10px;">
             <button class="cs-retry-btn" id="cs-regenerate" style="flex:1;">↻ 다시 생성</button>
             <button class="cs-retry-btn" id="cs-back" style="flex:1;">← 돌아가기</button>
@@ -484,6 +542,26 @@ function showResult(content, parsed, settings, profiles, overlay) {
         copyToClipboard(full.trim(), this);
     });
 
+    // 요약 완료 마킹
+    content.querySelector('#cs-mark-btn').addEventListener('click', async function () {
+        const startIdx = parseInt(content.querySelector('#cs-mark-start').value) || 0;
+        const endIdx = parseInt(content.querySelector('#cs-mark-end').value) || 0;
+
+        if (startIdx > endIdx) {
+            toastr.warning('시작 번호가 끝 번호보다 큽니다!');
+            return;
+        }
+
+        const count = await markAsSummarized(startIdx, endIdx);
+        this.textContent = `✓ ${count}개 메시지 표시 완료!`;
+        this.style.pointerEvents = 'none';
+        this.style.opacity = '0.6';
+
+        // 게이지 업데이트를 위해 info 새로 계산
+        const newInfo = getContextInfo();
+        toastr.success(`${count}개 메시지가 요약 완료로 표시되었습니다. 게이지: ${newInfo.usagePercent}%`);
+    });
+
     // 다시 생성
     content.querySelector('#cs-regenerate').addEventListener('click', () => {
         content.innerHTML = `<div class="cs-loading"><div class="cs-spinner"></div><span>요약 생성 중...</span></div>`;
@@ -495,7 +573,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
     });
 
-    // 초기화 (팝업 완전 삭제)
+    // 초기화
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
