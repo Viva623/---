@@ -162,10 +162,10 @@
     background: rgba(0,0,0,0.6);
     z-index: 999999;
     display: flex;
-    align-items: flex-start;        /* ★ center → flex-start: 위에서부터 배치 */
+    align-items: flex-start;
     justify-content: center;
-    overflow-y: auto;               /* ★ 팝업이 화면보다 길면 스크롤 */
-    padding: 40px 0 24px;           /* ★ 상하 여백 확보 */
+    overflow-y: auto;
+    padding: 40px 0 24px;
 }
 
 /* ── 팝업 ────────────────────────────────────── */
@@ -173,7 +173,7 @@
     position: relative;
     width: 92vw;
     max-width: 600px;
-    max-height: calc(100vh - 80px); /* ★ 고정높이 → 최대높이로 변경, 상하 패딩 감안 */
+    max-height: calc(100vh - 80px);
     background: var(--cs-bg);
     border: 1px solid var(--cs-border);
     border-radius: var(--cs-radius);
@@ -183,7 +183,7 @@
     overflow: hidden;
     font-family: var(--cs-font);
     color: var(--cs-text);
-    flex-shrink: 0;                 /* ★ 축소 방지 */
+    flex-shrink: 0;
 }
 
 /* ── 헤더 ────────────────────────────────────── */
@@ -191,7 +191,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;            /* ★ 14/18 → 16/20 여유 */
+    padding: 16px 20px;
     background: var(--cs-header-bg);
     border-bottom: 1px solid var(--cs-border);
     flex-shrink: 0;
@@ -219,20 +219,20 @@
     touch-action: pan-y;
     overscroll-behavior: contain;
     min-height: 0;
-    padding: 20px;                  /* ★ 16 → 20 */
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 18px;                      /* ★ 14 → 18 요소 간 간격 */
+    gap: 18px;
 }
 
 /* ── 컨텍스트 미터 ───────────────────────────── */
 .cs-context-meter {
     background: var(--cs-card-bg);
     border-radius: var(--cs-radius);
-    padding: 16px;                  /* ★ 14 → 16 */
+    padding: 16px;
     border: 1px solid var(--cs-border);
 }
-.cs-meter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; /* ★ 8 → 10 */ }
+.cs-meter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .cs-meter-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
 .cs-meter-value { font-size: 12px; font-weight: 700; color: var(--cs-text); }
 .cs-meter-bar { width: 100%; height: 8px; background: var(--cs-meter-track); border-radius: 4px; overflow: hidden; }
@@ -240,13 +240,13 @@
 .cs-meter-fill.safe { background: linear-gradient(90deg, #4ade80, #22c55e); }
 .cs-meter-fill.warning { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
 .cs-meter-fill.danger { background: linear-gradient(90deg, #f87171, #ef4444); }
-.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 8px; /* ★ 6 → 8 */ font-size: 11px; color: var(--cs-text-dim); }
+.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 8px; font-size: 11px; color: var(--cs-text-dim); }
 
 /* ── 요약 완료 라벨 ──────────────────────────── */
 .cs-summarized-info {
     font-size: 11px;
     color: var(--cs-success);
-    margin-top: 6px;               /* ★ 4 → 6 */
+    margin-top: 6px;
 }
 
 /* ── 경고 배너 ───────────────────────────────── */
@@ -254,17 +254,18 @@
     background: var(--cs-warning-bg);
     border: 1px solid var(--cs-warning-border);
     border-radius: var(--cs-radius);
-    padding: 14px 16px;            /* ★ 12/14 → 14/16 */
-    display: flex; align-items: center; gap: 10px;
+    padding: 14px 16px;
+    display: flex; align-items: flex-start; gap: 10px;
     font-size: 13px; color: var(--cs-warning-text);
+    line-height: 1.6;
 }
-.cs-warning-icon { font-size: 18px; flex-shrink: 0; }
+.cs-warning-icon { font-size: 18px; flex-shrink: 0; line-height: 1.6; }
 
 /* ── 프로필/프롬프트 섹션 ────────────────────── */
 .cs-profile-section, .cs-prompt-section {
     display: flex;
     flex-direction: column;
-    gap: 8px;                       /* ★ 6 → 8 */
+    gap: 8px;
 }
 .cs-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
 .cs-select {
@@ -274,7 +275,7 @@
 }
 .cs-prompt-toggle {
     display: flex; align-items: center; justify-content: space-between; cursor: pointer;
-    padding: 6px 0;                /* ★ 클릭 영역 여유 */
+    padding: 6px 0;
 }
 .cs-prompt-toggle-icon { font-size: 11px; color: var(--cs-text-dim); transition: transform 0.2s; }
 .cs-prompt-toggle-icon.open { transform: rotate(90deg); }
@@ -284,7 +285,7 @@
     border: 1px solid var(--cs-input-border); border-radius: var(--cs-radius);
     background: var(--cs-input-bg); font-family: var(--cs-font-mono); font-size: 12px; line-height: 1.6;
     color: var(--cs-text); padding: 12px; resize: vertical; box-sizing: border-box;
-    margin-top: 4px;               /* ★ 토글과 textarea 사이 간격 */
+    margin-top: 4px;
 }
 .cs-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
 
@@ -293,12 +294,12 @@
     background: var(--cs-card-bg);
     border: 1px solid var(--cs-border);
     border-radius: var(--cs-radius);
-    padding: 16px;                  /* ★ 14 → 16 */
+    padding: 16px;
 }
-.cs-range-header { font-size: 13px; font-weight: 700; color: var(--cs-text-sub); margin-bottom: 12px; /* ★ 10 → 12 */ }
-.cs-range-inputs { display: flex; align-items: center; gap: 10px; /* ★ 8 → 10 */ }
+.cs-range-header { font-size: 13px; font-weight: 700; color: var(--cs-text-sub); margin-bottom: 12px; }
+.cs-range-inputs { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cs-range-input {
-    width: 70px; padding: 8px 8px;  /* ★ 6 → 8 */
+    width: 70px; padding: 8px 8px;
     text-align: center;
     border: 1px solid var(--cs-input-border); border-radius: var(--cs-radius);
     background: var(--cs-input-bg); color: var(--cs-text);
@@ -306,15 +307,15 @@
 }
 .cs-range-input:focus { border-color: var(--cs-input-focus); outline: none; }
 .cs-range-sep { color: var(--cs-text-dim); font-size: 13px; }
-.cs-range-info { font-size: 11px; color: var(--cs-text-dim); margin-top: 10px; /* ★ 8 → 10 */ }
+.cs-range-info { font-size: 11px; color: var(--cs-text-dim); margin-top: 10px; }
 
 /* ── 생성 버튼 ───────────────────────────────── */
 .cs-generate-btn {
-    width: 100%; padding: 14px;     /* ★ 12 → 14 */
+    width: 100%; padding: 14px;
     background: var(--cs-accent-gradient); color: #fff; border: none;
     border-radius: var(--cs-radius); font-family: var(--cs-font);
     font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;
-    margin-top: 4px;                /* ★ 버튼 위 여백 */
+    margin-top: 4px;
 }
 .cs-generate-btn:hover { opacity: 0.9; }
 .cs-generate-btn:active { transform: scale(0.98); }
@@ -323,8 +324,7 @@
 /* ── 로딩 ────────────────────────────────────── */
 .cs-loading {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 16px;                      /* ★ 14 → 16 */
-    padding: 48px 20px;             /* ★ 40 → 48 */
+    gap: 16px; padding: 48px 20px;
     color: var(--cs-text-sub); font-size: 14px;
 }
 .cs-spinner {
@@ -343,7 +343,7 @@
 }
 .cs-result-header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 16px;            /* ★ 12/14 → 14/16 */
+    padding: 14px 16px;
     cursor: pointer; user-select: none;
 }
 .cs-result-header:hover { background: var(--cs-section-hover); }
@@ -351,9 +351,9 @@
     font-size: 13px; font-weight: 700; color: var(--cs-accent-text);
     display: flex; align-items: center; gap: 8px;
 }
-.cs-result-actions { display: flex; gap: 8px; /* ★ 6 → 8 */ }
+.cs-result-actions { display: flex; gap: 8px; }
 .cs-copy-btn {
-    padding: 5px 12px;             /* ★ 4/10 → 5/12 */
+    padding: 5px 12px;
     background: var(--cs-accent-light); border: 1px solid var(--cs-accent-border);
     border-radius: 6px; color: var(--cs-accent-text);
     font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--cs-font); transition: all 0.15s;
@@ -361,21 +361,21 @@
 .cs-copy-btn:hover { background: var(--cs-copy-hover); }
 .cs-copy-btn.copied { background: rgba(74, 222, 128, 0.2); border-color: rgba(74, 222, 128, 0.4); color: var(--cs-success); }
 
-.cs-result-body { padding: 16px; /* ★ 14 → 16 */ display: none; }
+.cs-result-body { padding: 16px; display: none; }
 .cs-result-body.open { display: block; }
 
 .cs-result-textarea {
     width: 100%; background: var(--cs-textarea-bg);
     border: 1px solid var(--cs-input-border); border-radius: 6px;
     color: var(--cs-text); font-family: var(--cs-font-mono);
-    font-size: 12.5px; line-height: 1.7; padding: 12px; /* ★ 10 → 12 */ resize: vertical;
+    font-size: 12.5px; line-height: 1.7; padding: 12px; resize: vertical;
     box-sizing: border-box; white-space: pre-wrap; word-break: break-word;
 }
 .cs-result-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
 
 /* ── 전체 복사 / 보조 버튼 ───────────────────── */
 .cs-copy-all-btn {
-    width: 100%; padding: 12px;     /* ★ 10 → 12 */
+    width: 100%; padding: 12px;
     background: var(--cs-accent-light); border: 1px solid var(--cs-accent-border);
     border-radius: var(--cs-radius); color: var(--cs-accent-text);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s;
@@ -383,7 +383,7 @@
 .cs-copy-all-btn:hover { background: var(--cs-copy-hover); }
 
 .cs-retry-btn {
-    width: 100%; padding: 12px;     /* ★ 10 → 12 */
+    width: 100%; padding: 12px;
     background: var(--cs-btn-secondary-bg); border: 1px solid var(--cs-btn-secondary-border);
     border-radius: var(--cs-radius); color: var(--cs-btn-secondary-text);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer;
@@ -391,7 +391,7 @@
 
 /* ── 마크 버튼 ───────────────────────────────── */
 .cs-mark-btn {
-    width: 100%; padding: 12px;     /* ★ 10 → 12 */
+    width: 100%; padding: 12px;
     background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3);
     border-radius: var(--cs-radius); color: var(--cs-success);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s;
@@ -399,11 +399,25 @@
 .cs-mark-btn:hover { background: rgba(74, 222, 128, 0.2); }
 
 /* ── 에러 ────────────────────────────────────── */
-.cs-error-msg {                     /* ★ 클래스명 변경 (.cs-error → .cs-error-msg) 변수와 충돌 방지 */
-    padding: 24px;                  /* ★ 20 → 24 */
+.cs-error-msg {
+    padding: 24px;
     text-align: center;
     color: var(--cs-error);
     font-size: 13px; font-weight: 700;
+}
+
+/* ── 하단 버튼 그룹 (결과 화면) ──────────────── */
+.cs-bottom-actions {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+}
+.cs-bottom-actions .cs-retry-btn {
+    flex: 1;
+    min-width: 0;
+}
+.cs-bottom-actions .cs-retry-btn:last-child {
+    flex: 0.8;
 }
 
 /* ── 경고 팝업 ───────────────────────────────── */
@@ -419,22 +433,22 @@
     background: var(--cs-bg, #1a1a2e);
     border: 1px solid var(--cs-error, #f87171);
     border-radius: var(--cs-radius, 12px);
-    padding: 28px;                  /* ★ 24 → 28 */
+    padding: 28px;
     text-align: center;
     font-family: var(--cs-font, 'Noto Sans KR', sans-serif);
     color: var(--cs-text, #e0e0e0);
 }
-.cs-alert-icon { font-size: 32px; margin-bottom: 14px; /* ★ 12 → 14 */ }
-.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 10px; /* ★ 8 → 10 */ }
-.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 20px; /* ★ 18 → 20 */ }
-.cs-alert-buttons { display: flex; gap: 12px; /* ★ 10 → 12 */ justify-content: center; }
+.cs-alert-icon { font-size: 32px; margin-bottom: 14px; }
+.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 10px; }
+.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 20px; }
+.cs-alert-buttons { display: flex; gap: 12px; justify-content: center; }
 .cs-alert-ok {
-    padding: 10px 28px;            /* ★ 8/24 → 10/28 */
+    padding: 10px 28px;
     background: var(--cs-accent-gradient); color: #fff; border: none;
     border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--cs-font);
 }
 .cs-alert-summarize {
-    padding: 10px 28px;            /* ★ 8/24 → 10/28 */
+    padding: 10px 28px;
     background: var(--cs-btn-secondary-bg); color: var(--cs-btn-secondary-text);
     border: 1px solid var(--cs-btn-secondary-border);
     border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--cs-font);
@@ -533,37 +547,43 @@
 
 [data-theme="romance"] .cs-header {
     background: transparent; border-bottom: 1px solid rgba(200,160,60,0.3);
-    position: relative; z-index: 1; padding: 18px 16px 16px; /* ★ 16/16/14 → 18/16/16 */ text-align: center;
+    position: relative; z-index: 1; padding: 18px 16px 16px; text-align: center;
 }
+/* 왕관 – 배경 제거, 자연스럽게 녹아듦 */
 [data-theme="romance"] .cs-header::before {
     content: '♛'; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
-    font-size: 20px; color: #d4a84c; background: var(--cs-bg); padding: 0 10px;
+    font-size: 20px; color: #d4a84c;
+    background: transparent; padding: 0;
     filter: drop-shadow(0 0 4px rgba(200,160,60,0.4));
 }
+/* ✦ 구분선 – 헤더 안쪽으로 이동, 배경 제거 */
 [data-theme="romance"] .cs-header::after {
     content: '━━ ✦ ━━━━━━ ✦ ━━━━━━ ✦ ━━';
-    position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
-    font-size: 9px; color: rgba(200,160,60,0.4); background: var(--cs-bg);
-    padding: 0 12px; letter-spacing: 1px; white-space: nowrap;
+    position: absolute; bottom: 0px; left: 50%; transform: translateX(-50%);
+    font-size: 9px; color: rgba(200,160,60,0.4);
+    background: transparent; padding: 0;
+    letter-spacing: 1px; white-space: nowrap;
 }
 [data-theme="romance"] .cs-header-title {
     color: #e8c868; letter-spacing: 4px; font-size: 15px; width: 100%; text-align: center;
     padding-top: 6px; text-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 [data-theme="romance"] .cs-close-btn {
-    position: absolute; right: 22px; top: 18px; /* ★ 16 → 18 */
+    position: absolute; right: 22px; top: 18px;
     background: rgba(200,160,60,0.1); border: 1px solid rgba(200,160,60,0.3); color: #c8a060; font-size: 12px; z-index: 1;
 }
 [data-theme="romance"] .cs-close-btn:hover { background: rgba(200,160,60,0.2); }
-[data-theme="romance"] .cs-content { z-index: 1; position: relative; padding-top: 24px; /* ★ 장식선 아래 여백 */ }
+[data-theme="romance"] .cs-content { z-index: 1; position: relative; padding-top: 24px; }
 
+/* ✿ 꽃무늬 장식 삭제 */
 [data-theme="romance"] .cs-context-meter {
-    border: 1px solid rgba(200,160,60,0.3); background: rgba(60,20,34,0.8); position: relative;
+    border: 1px solid rgba(200,160,60,0.3); background: rgba(60,20,34,0.8);
 }
+/* ::before 완전 제거 */
 [data-theme="romance"] .cs-context-meter::before {
-    content: '── ✿ ──'; position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
-    font-size: 10px; color: rgba(200,160,60,0.5); background: var(--cs-bg); padding: 0 10px; letter-spacing: 2px;
+    display: none;
 }
+
 [data-theme="romance"] .cs-meter-fill.safe { background: linear-gradient(90deg, #60a050, #80c860); }
 [data-theme="romance"] .cs-meter-fill.warning { background: linear-gradient(90deg, #d4a84c, #e8c060); }
 [data-theme="romance"] .cs-meter-fill.danger { background: linear-gradient(90deg, #c04040, #e06050); }
@@ -604,13 +624,23 @@
 /* ── 모바일 ──────────────────────────────────── */
 @media (max-width: 480px) {
     .cs-overlay {
-        padding: 24px 0 16px;      /* ★ 모바일 상하 패딩 조정 */
+        padding: 24px 0 16px;
     }
     .cs-popup {
         width: 96vw;
-        max-height: calc(100vh - 48px); /* ★ 모바일도 최대높이 제한 */
+        max-height: calc(100vh - 48px);
     }
     .cs-content { padding: 14px; gap: 14px; }
     .cs-textarea { min-height: 150px; font-size: 11px; }
     [data-theme="retro"] .cs-header-title { font-size: 8px; }
+
+    /* 모바일에서도 하단 버튼 가로 유지 */
+    .cs-bottom-actions {
+        flex-direction: row;
+        gap: 8px;
+    }
+    .cs-bottom-actions .cs-retry-btn {
+        padding: 10px 4px;
+        font-size: 12px;
+    }
 }
