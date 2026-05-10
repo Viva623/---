@@ -105,9 +105,25 @@ function getContextInfo() {
 
     const maxContext = parseInt(maxCtxEl?.value) || ctx.maxContext || 8192;
     const reservedResponse = parseInt(maxTokEl?.value) || 0;
-    const available = maxContext - reservedResponse;
 
-    let chatTokens = 0;
+    // ★ 로어북(World Info) 예산 계산
+    const wiBudgetEl = document.getElementById('world_info_budget');
+    const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
+    const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
+    const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
+
+    let wiBudgetTokens = 0;
+    if (wiBudgetPercent > 0) {
+        wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
+        if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) {
+            wiBudgetTokens = wiBudgetCap;
+        }
+    }
+
+    const available = maxContext - reservedResponse - wiBudgetTokens;
+
+    // ★ 전체 토큰 & 요약 완료 토큰
+    let allTokens = 0;
     let summarizedTokens = 0;
     let summarizedCount = 0;
 
@@ -116,16 +132,32 @@ function getContextInfo() {
         if (msg.extra?.cs_summarized) {
             summarizedTokens += tokens;
             summarizedCount++;
-        } else {
-            chatTokens += tokens;
         }
+        allTokens += tokens;
     }
 
-    const usagePercent = available > 0 ? Math.round((chatTokens / available) * 100) : 0;
+    // ★ 실제 컨텍스트에 들어가는 토큰 계산 (뒤에서부터)
+    let inContextTokens = 0;
+    let inContextStart = ctx.chat.length; // 컨텍스트에 포함되는 첫 메시지 인덱스
+
+    for (let i = ctx.chat.length - 1; i >= 0; i--) {
+        const msg = ctx.chat[i];
+        if (msg.extra?.cs_summarized) continue; // 요약된 건 스킵
+        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+        if (inContextTokens + tokens > available) break; // 넘치면 중단
+        inContextTokens += tokens;
+        inContextStart = i;
+    }
+
+    const truncatedCount = inContextStart; // 잘리는 메시지 수
+    const usagePercent = available > 0 ? Math.round((inContextTokens / available) * 100) : 0;
 
     return {
-        maxContext, reservedResponse, available,
-        chatTokens, summarizedTokens, summarizedCount,
+        maxContext, reservedResponse, wiBudgetTokens, available,
+        chatTokens: inContextTokens,    // 실제 컨텍스트에 들어가는 토큰
+        allTokens,                       // 전체 채팅 토큰
+        summarizedTokens, summarizedCount,
+        truncatedCount, inContextStart,  // 잘림 정보
         usagePercent, chatLength: ctx.chat.length
     };
 }
@@ -333,6 +365,11 @@ function showMainView(content, settings, profiles, info, overlay) {
         summarizedHtml = `<div class="cs-summarized-info">✓ ${info.summarizedCount}개 메시지 요약 완료 (${info.summarizedTokens.toLocaleString()} 토큰 제외됨)</div>`;
     }
 
+        let truncatedHtml = '';
+    if (info.truncatedCount > 0) {
+        truncatedHtml = `<div class="cs-truncated-info">⚠️ 메시지 0~${info.truncatedCount - 1}번 (${info.truncatedCount}개)이 컨텍스트에서 잘렸습니다</div>`;
+    }
+
     content.innerHTML = `
         <div class="cs-context-meter">
             <div class="cs-meter-header">
@@ -346,6 +383,8 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span>
                 <span>가용: ${info.available.toLocaleString()} 토큰</span>
             </div>
+            ${info.wiBudgetTokens > 0 ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>📚 로어북 예약: ${info.wiBudgetTokens.toLocaleString()} 토큰</span><span>전체: ${info.maxContext.toLocaleString()}</span></div>` : ''}
+            ${truncatedHtml}
             ${summarizedHtml}
         </div>
         ${warningHtml}
