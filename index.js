@@ -97,8 +97,8 @@ function getCsSettings() {
 }
 
 // ===== Fetch 모니터 (실측 시스템 토큰) =====
-let _csLastSystemTokens = null;
-let _csLastChatRange = null;
+window._csLastSystemTokens = null;
+window._csLastChatRange = null;
 
 function installFetchMonitor() {
     if (window._csMonitorInstalled) return;
@@ -159,7 +159,7 @@ function installFetchMonitor() {
                         }
                     }
 
-                    _csLastSystemTokens = systemTokens;
+                    window._csLastSystemTokens = systemTokens;
 
                     // ★ 3단계: API 채팅 메시지 개수로 ctx.chat 시작점 역산
                     let apiChatMsgCount = 0;
@@ -182,7 +182,7 @@ function installFetchMonitor() {
                         }
                     }
 
-                    _csLastChatRange = {
+                    window._csLastChatRange = {
                         startIdx: startIdx,
                         endIdx: ctx.chat.length - 1,
                         truncatedCount: startIdx
@@ -227,10 +227,10 @@ function getContextInfo() {
     let truncatedCount;
     let inContextTokens;
 
-    if (_csLastSystemTokens !== null && _csLastChatRange !== null) {
-        // ★ 실측값 사용
-        systemTokens = _csLastSystemTokens;
-        truncatedCount = _csLastChatRange.truncatedCount;
+    // 변경
+    if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
+        systemTokens = window._csLastSystemTokens;
+        truncatedCount = window._csLastChatRange.truncatedCount;
         inContextTokens = 0;
         for (let i = _csLastChatRange.startIdx; i < ctx.chat.length; i++) {
             if (ctx.chat[i].extra?.cs_summarized) continue;
@@ -286,7 +286,7 @@ function getContextInfo() {
         truncatedCount,
         usagePercent,
         chatLength: ctx.chat.length,
-        isEstimated: _csLastSystemTokens === null
+        isEstimated: window._csLastSystemTokens === null
     };
 }
 
