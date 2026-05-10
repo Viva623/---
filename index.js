@@ -252,7 +252,6 @@ function showContextWarning(info) {
 function showSummarizerPopup() {
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
-        // ★ 팝업을 다시 열 때 항상 최신 info로 메인 뷰 갱신
         existing.style.display = 'flex';
         const settings = getCsSettings();
         const profiles = getAvailableProfiles();
@@ -274,7 +273,6 @@ function showSummarizerPopup() {
     const popup = document.createElement('div');
     popup.className = 'cs-popup';
 
-    // 로판 코너 장식
     ['romance-corner-tr', 'romance-corner-bl', 'romance-corner-br'].forEach(cls => {
         const span = document.createElement('span');
         span.className = cls;
@@ -361,20 +359,26 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
             </div>
             <textarea class="cs-textarea" id="cs-prompt-area" style="display:none;">${escapeHtml(settings.promptTemplate)}</textarea>
+            <button class="cs-prompt-reset-btn" id="cs-prompt-reset" style="display:none;">↻ 프롬프트 초기화</button>
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
+    // ★ 프로필 선택
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
+    // ★ 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
+    const promptResetBtn = content.querySelector('#cs-prompt-reset');
+
     toggleBtn.addEventListener('click', () => {
         const visible = promptArea.style.display !== 'none';
         promptArea.style.display = visible ? 'none' : 'block';
+        promptResetBtn.style.display = visible ? 'none' : 'block';  // ★ 초기화 버튼도 같이 토글
         toggleIcon.textContent = visible ? '▶' : '▼';
         toggleIcon.classList.toggle('open', !visible);
     });
@@ -384,6 +388,16 @@ function showMainView(content, settings, profiles, info, overlay) {
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
+    // ★ 프롬프트 초기화 버튼
+    promptResetBtn.addEventListener('click', () => {
+        if (!confirm('프롬프트를 기본값으로 초기화할까요?')) return;
+        settings.promptTemplate = CS_DEFAULT_PROMPT;
+        promptArea.value = CS_DEFAULT_PROMPT;
+        SillyTavern.getContext().saveSettingsDebounced();
+        toastr.success('프롬프트가 기본값으로 초기화되었습니다.');
+    });
+
+    // ★ 요약 생성
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -459,25 +473,50 @@ function showResult(content, parsed, settings, profiles, overlay) {
         Lore: '📖 로어',
     };
 
-    let sectionsHtml = '';
-    for (const [key, label] of Object.entries(sectionLabels)) {
-        const text = parsed.sections[key] || '';
-        const has = text.trim().length > 0;
-        const lines = Math.max(3, text.split('\n').length + 2);
+    // ★ 모든 섹션이 비어있는지 체크
+    const allEmpty = Object.values(parsed.sections).every(v => !v.trim());
 
-        sectionsHtml += `
-            <div class="cs-result-section" data-section="${key}">
+    let sectionsHtml = '';
+    if (!allEmpty) {
+        for (const [key, label] of Object.entries(sectionLabels)) {
+            const text = parsed.sections[key] || '';
+            const has = text.trim().length > 0;
+            const lines = Math.max(3, text.split('\n').length + 2);
+
+            sectionsHtml += `
+                <div class="cs-result-section" data-section="${key}">
+                    <div class="cs-result-header">
+                        <div class="cs-result-title">
+                            <span>${label}</span>
+                            ${has ? '' : '<span style="font-size:11px;color:var(--cs-text-dim);">(비어있음)</span>'}
+                        </div>
+                        <div class="cs-result-actions">
+                            <button class="cs-copy-btn" data-copy-section="${key}">복사</button>
+                        </div>
+                    </div>
+                    <div class="cs-result-body">
+                        <textarea class="cs-result-textarea" data-section="${key}" rows="${lines}">${escapeHtml(text)}</textarea>
+                    </div>
+                </div>`;
+        }
+    }
+
+    // ★ 섹션 파싱 실패 시 raw 전체 표시
+    let rawFallbackHtml = '';
+    if (allEmpty && parsed.raw.trim()) {
+        const rawLines = Math.max(5, parsed.raw.split('\n').length + 2);
+        rawFallbackHtml = `
+            <div class="cs-result-section" data-section="raw">
                 <div class="cs-result-header">
                     <div class="cs-result-title">
-                        <span>${label}</span>
-                        ${has ? '' : '<span style="font-size:11px;color:var(--cs-text-dim);">(비어있음)</span>'}
+                        <span>📄 전체 응답 (커스텀 형식)</span>
                     </div>
                     <div class="cs-result-actions">
-                        <button class="cs-copy-btn" data-copy-section="${key}">복사</button>
+                        <button class="cs-copy-btn" data-copy-section="raw">복사</button>
                     </div>
                 </div>
-                <div class="cs-result-body">
-                    <textarea class="cs-result-textarea" data-section="${key}" rows="${lines}">${escapeHtml(text)}</textarea>
+                <div class="cs-result-body open">
+                    <textarea class="cs-result-textarea" data-section="raw" rows="${rawLines}">${escapeHtml(parsed.raw)}</textarea>
                 </div>
             </div>`;
     }
@@ -496,6 +535,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
             </div>
         </div>
         ${sectionsHtml}
+        ${rawFallbackHtml}
         <button class="cs-copy-all-btn" id="cs-copy-all">📋 전체 복사</button>
         <div class="cs-range-section">
             <div class="cs-range-header">📌 요약 완료 표시 (게이지에서 제외)</div>
@@ -662,14 +702,12 @@ function addCsButton() {
         showSummarizerPopup();
     });
 
-    // ★ 기존 래퍼가 있으면 거기에 추가, 없으면 send_form 또는 leftSendForm에 삽입
     const existingWrapper = document.getElementById('cb-btn-wrapper');
     if (existingWrapper) {
         existingWrapper.appendChild(btn);
         return;
     }
 
-    // ★ send_form 내부 맨 앞에 삽입 (래퍼 없이 직접)
     const sendForm = document.getElementById('leftSendForm') || document.getElementById('send_form');
     if (sendForm) {
         sendForm.insertBefore(btn, sendForm.firstChild);
