@@ -106,7 +106,7 @@ function getContextInfo() {
     const maxContext = parseInt(maxCtxEl?.value) || ctx.maxContext || 8192;
     const reservedResponse = parseInt(maxTokEl?.value) || 0;
 
-    // ★ 로어북(World Info) 예산 계산
+    // 로어북(World Info) 예산
     const wiBudgetEl = document.getElementById('world_info_budget');
     const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
     const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
@@ -121,6 +121,46 @@ function getContextInfo() {
     }
 
     const available = maxContext - reservedResponse - wiBudgetTokens;
+
+    // 전체 채팅 토큰 계산
+    let chatTokens = 0;
+    let summarizedTokens = 0;
+    let summarizedCount = 0;
+
+    for (const msg of ctx.chat) {
+        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+        if (msg.extra?.cs_summarized) {
+            summarizedTokens += tokens;
+            summarizedCount++;
+        } else {
+            chatTokens += tokens;
+        }
+    }
+
+    // 잘림 계산: 전체 토큰이 가용치를 넘으면 뒤에서부터 채워서 어디서 잘리는지 확인
+    let truncatedCount = 0;
+    if (chatTokens > available) {
+        let sum = 0;
+        for (let i = ctx.chat.length - 1; i >= 0; i--) {
+            if (ctx.chat[i].extra?.cs_summarized) continue;
+            const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+            if (sum + tokens > available) {
+                truncatedCount = i + 1;
+                break;
+            }
+            sum += tokens;
+        }
+    }
+
+    const usagePercent = available > 0 ? Math.round((chatTokens / available) * 100) : 0;
+
+    return {
+        maxContext, reservedResponse, wiBudgetTokens, available,
+        chatTokens, summarizedTokens, summarizedCount,
+        truncatedCount,
+        usagePercent, chatLength: ctx.chat.length
+    };
+}
 
     // ★ 전체 토큰 & 요약 완료 토큰
     let allTokens = 0;
@@ -394,14 +434,15 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
                 <div class="cs-prompt-section">
             <div class="cs-prompt-toggle" id="cs-prompt-toggle">
-                <span class="cs-label">요약 프롬프트</span>
-                <div class="cs-prompt-toggle-right">
+                <div class="cs-prompt-toggle-left">
+                    <span class="cs-label">요약 프롬프트</span>
                     <button class="cs-prompt-reset-btn" id="cs-prompt-reset" style="display:none;">↻ 초기화</button>
-                    <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
                 </div>
+                <span class="cs-prompt-toggle-icon" id="cs-toggle-icon">▶</span>
             </div>
             <textarea class="cs-textarea" id="cs-prompt-area" style="display:none;">${escapeHtml(settings.promptTemplate)}</textarea>
         </div>
+
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
     // ★ 프로필 선택
