@@ -162,9 +162,10 @@
     background: rgba(0,0,0,0.6);
     z-index: 999999;
     display: flex;
-    align-items: center;
+    align-items: flex-start;        /* ★ center → flex-start: 위에서부터 배치 */
     justify-content: center;
-    overflow: visible;
+    overflow-y: auto;               /* ★ 팝업이 화면보다 길면 스크롤 */
+    padding: 40px 0 24px;           /* ★ 상하 여백 확보 */
 }
 
 /* ── 팝업 ────────────────────────────────────── */
@@ -172,7 +173,7 @@
     position: relative;
     width: 92vw;
     max-width: 600px;
-    height: 85vh;
+    max-height: calc(100vh - 80px); /* ★ 고정높이 → 최대높이로 변경, 상하 패딩 감안 */
     background: var(--cs-bg);
     border: 1px solid var(--cs-border);
     border-radius: var(--cs-radius);
@@ -182,6 +183,7 @@
     overflow: hidden;
     font-family: var(--cs-font);
     color: var(--cs-text);
+    flex-shrink: 0;                 /* ★ 축소 방지 */
 }
 
 /* ── 헤더 ────────────────────────────────────── */
@@ -189,7 +191,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 18px;
+    padding: 16px 20px;            /* ★ 14/18 → 16/20 여유 */
     background: var(--cs-header-bg);
     border-bottom: 1px solid var(--cs-border);
     flex-shrink: 0;
@@ -217,20 +219,20 @@
     touch-action: pan-y;
     overscroll-behavior: contain;
     min-height: 0;
-    padding: 16px;
+    padding: 20px;                  /* ★ 16 → 20 */
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 18px;                      /* ★ 14 → 18 요소 간 간격 */
 }
 
 /* ── 컨텍스트 미터 ───────────────────────────── */
 .cs-context-meter {
     background: var(--cs-card-bg);
     border-radius: var(--cs-radius);
-    padding: 14px;
+    padding: 16px;                  /* ★ 14 → 16 */
     border: 1px solid var(--cs-border);
 }
-.cs-meter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cs-meter-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; /* ★ 8 → 10 */ }
 .cs-meter-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
 .cs-meter-value { font-size: 12px; font-weight: 700; color: var(--cs-text); }
 .cs-meter-bar { width: 100%; height: 8px; background: var(--cs-meter-track); border-radius: 4px; overflow: hidden; }
@@ -238,13 +240,13 @@
 .cs-meter-fill.safe { background: linear-gradient(90deg, #4ade80, #22c55e); }
 .cs-meter-fill.warning { background: linear-gradient(90deg, #fbbf24, #f59e0b); }
 .cs-meter-fill.danger { background: linear-gradient(90deg, #f87171, #ef4444); }
-.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 6px; font-size: 11px; color: var(--cs-text-dim); }
+.cs-meter-detail { display: flex; justify-content: space-between; margin-top: 8px; /* ★ 6 → 8 */ font-size: 11px; color: var(--cs-text-dim); }
 
 /* ── 요약 완료 라벨 ──────────────────────────── */
 .cs-summarized-info {
     font-size: 11px;
     color: var(--cs-success);
-    margin-top: 4px;
+    margin-top: 6px;               /* ★ 4 → 6 */
 }
 
 /* ── 경고 배너 ───────────────────────────────── */
@@ -252,21 +254,28 @@
     background: var(--cs-warning-bg);
     border: 1px solid var(--cs-warning-border);
     border-radius: var(--cs-radius);
-    padding: 12px 14px;
+    padding: 14px 16px;            /* ★ 12/14 → 14/16 */
     display: flex; align-items: center; gap: 10px;
     font-size: 13px; color: var(--cs-warning-text);
 }
 .cs-warning-icon { font-size: 18px; flex-shrink: 0; }
 
 /* ── 프로필/프롬프트 섹션 ────────────────────── */
-.cs-profile-section, .cs-prompt-section { display: flex; flex-direction: column; gap: 6px; }
+.cs-profile-section, .cs-prompt-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;                       /* ★ 6 → 8 */
+}
 .cs-label { font-size: 12px; font-weight: 700; color: var(--cs-text-sub); }
 .cs-select {
     width: 100%; padding: 10px 12px;
     border: 1px solid var(--cs-input-border); border-radius: var(--cs-radius);
     background: var(--cs-input-bg); font-family: var(--cs-font); font-size: 13px; color: var(--cs-text); cursor: pointer;
 }
-.cs-prompt-toggle { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+.cs-prompt-toggle {
+    display: flex; align-items: center; justify-content: space-between; cursor: pointer;
+    padding: 6px 0;                /* ★ 클릭 영역 여유 */
+}
 .cs-prompt-toggle-icon { font-size: 11px; color: var(--cs-text-dim); transition: transform 0.2s; }
 .cs-prompt-toggle-icon.open { transform: rotate(90deg); }
 
@@ -275,6 +284,7 @@
     border: 1px solid var(--cs-input-border); border-radius: var(--cs-radius);
     background: var(--cs-input-bg); font-family: var(--cs-font-mono); font-size: 12px; line-height: 1.6;
     color: var(--cs-text); padding: 12px; resize: vertical; box-sizing: border-box;
+    margin-top: 4px;               /* ★ 토글과 textarea 사이 간격 */
 }
 .cs-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
 
@@ -283,26 +293,28 @@
     background: var(--cs-card-bg);
     border: 1px solid var(--cs-border);
     border-radius: var(--cs-radius);
-    padding: 14px;
+    padding: 16px;                  /* ★ 14 → 16 */
 }
-.cs-range-header { font-size: 13px; font-weight: 700; color: var(--cs-text-sub); margin-bottom: 10px; }
-.cs-range-inputs { display: flex; align-items: center; gap: 8px; }
+.cs-range-header { font-size: 13px; font-weight: 700; color: var(--cs-text-sub); margin-bottom: 12px; /* ★ 10 → 12 */ }
+.cs-range-inputs { display: flex; align-items: center; gap: 10px; /* ★ 8 → 10 */ }
 .cs-range-input {
-    width: 70px; padding: 6px 8px; text-align: center;
+    width: 70px; padding: 8px 8px;  /* ★ 6 → 8 */
+    text-align: center;
     border: 1px solid var(--cs-input-border); border-radius: var(--cs-radius);
     background: var(--cs-input-bg); color: var(--cs-text);
     font-family: var(--cs-font); font-size: 13px;
 }
 .cs-range-input:focus { border-color: var(--cs-input-focus); outline: none; }
 .cs-range-sep { color: var(--cs-text-dim); font-size: 13px; }
-.cs-range-info { font-size: 11px; color: var(--cs-text-dim); margin-top: 8px; }
+.cs-range-info { font-size: 11px; color: var(--cs-text-dim); margin-top: 10px; /* ★ 8 → 10 */ }
 
 /* ── 생성 버튼 ───────────────────────────────── */
 .cs-generate-btn {
-    width: 100%; padding: 12px;
+    width: 100%; padding: 14px;     /* ★ 12 → 14 */
     background: var(--cs-accent-gradient); color: #fff; border: none;
     border-radius: var(--cs-radius); font-family: var(--cs-font);
     font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s ease;
+    margin-top: 4px;                /* ★ 버튼 위 여백 */
 }
 .cs-generate-btn:hover { opacity: 0.9; }
 .cs-generate-btn:active { transform: scale(0.98); }
@@ -311,7 +323,9 @@
 /* ── 로딩 ────────────────────────────────────── */
 .cs-loading {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 14px; padding: 40px 20px; color: var(--cs-text-sub); font-size: 14px;
+    gap: 16px;                      /* ★ 14 → 16 */
+    padding: 48px 20px;             /* ★ 40 → 48 */
+    color: var(--cs-text-sub); font-size: 14px;
 }
 .cs-spinner {
     width: 32px; height: 32px;
@@ -329,16 +343,17 @@
 }
 .cs-result-header {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 12px 14px; cursor: pointer; user-select: none;
+    padding: 14px 16px;            /* ★ 12/14 → 14/16 */
+    cursor: pointer; user-select: none;
 }
 .cs-result-header:hover { background: var(--cs-section-hover); }
 .cs-result-title {
     font-size: 13px; font-weight: 700; color: var(--cs-accent-text);
     display: flex; align-items: center; gap: 8px;
 }
-.cs-result-actions { display: flex; gap: 6px; }
+.cs-result-actions { display: flex; gap: 8px; /* ★ 6 → 8 */ }
 .cs-copy-btn {
-    padding: 4px 10px;
+    padding: 5px 12px;             /* ★ 4/10 → 5/12 */
     background: var(--cs-accent-light); border: 1px solid var(--cs-accent-border);
     border-radius: 6px; color: var(--cs-accent-text);
     font-size: 11px; font-weight: 700; cursor: pointer; font-family: var(--cs-font); transition: all 0.15s;
@@ -346,21 +361,21 @@
 .cs-copy-btn:hover { background: var(--cs-copy-hover); }
 .cs-copy-btn.copied { background: rgba(74, 222, 128, 0.2); border-color: rgba(74, 222, 128, 0.4); color: var(--cs-success); }
 
-.cs-result-body { padding: 14px; display: none; }
+.cs-result-body { padding: 16px; /* ★ 14 → 16 */ display: none; }
 .cs-result-body.open { display: block; }
 
 .cs-result-textarea {
     width: 100%; background: var(--cs-textarea-bg);
     border: 1px solid var(--cs-input-border); border-radius: 6px;
     color: var(--cs-text); font-family: var(--cs-font-mono);
-    font-size: 12.5px; line-height: 1.7; padding: 10px; resize: vertical;
+    font-size: 12.5px; line-height: 1.7; padding: 12px; /* ★ 10 → 12 */ resize: vertical;
     box-sizing: border-box; white-space: pre-wrap; word-break: break-word;
 }
 .cs-result-textarea:focus { border-color: var(--cs-input-focus); outline: none; }
 
 /* ── 전체 복사 / 보조 버튼 ───────────────────── */
 .cs-copy-all-btn {
-    width: 100%; padding: 10px;
+    width: 100%; padding: 12px;     /* ★ 10 → 12 */
     background: var(--cs-accent-light); border: 1px solid var(--cs-accent-border);
     border-radius: var(--cs-radius); color: var(--cs-accent-text);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s;
@@ -368,7 +383,7 @@
 .cs-copy-all-btn:hover { background: var(--cs-copy-hover); }
 
 .cs-retry-btn {
-    width: 100%; padding: 10px;
+    width: 100%; padding: 12px;     /* ★ 10 → 12 */
     background: var(--cs-btn-secondary-bg); border: 1px solid var(--cs-btn-secondary-border);
     border-radius: var(--cs-radius); color: var(--cs-btn-secondary-text);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer;
@@ -376,7 +391,7 @@
 
 /* ── 마크 버튼 ───────────────────────────────── */
 .cs-mark-btn {
-    width: 100%; padding: 10px;
+    width: 100%; padding: 12px;     /* ★ 10 → 12 */
     background: rgba(74, 222, 128, 0.1); border: 1px solid rgba(74, 222, 128, 0.3);
     border-radius: var(--cs-radius); color: var(--cs-success);
     font-family: var(--cs-font); font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s;
@@ -384,7 +399,12 @@
 .cs-mark-btn:hover { background: rgba(74, 222, 128, 0.2); }
 
 /* ── 에러 ────────────────────────────────────── */
-.cs-error { padding: 20px; text-align: center; color: var(--cs-error); font-size: 13px; font-weight: 700; }
+.cs-error-msg {                     /* ★ 클래스명 변경 (.cs-error → .cs-error-msg) 변수와 충돌 방지 */
+    padding: 24px;                  /* ★ 20 → 24 */
+    text-align: center;
+    color: var(--cs-error);
+    font-size: 13px; font-weight: 700;
+}
 
 /* ── 경고 팝업 ───────────────────────────────── */
 .cs-alert-overlay {
@@ -399,21 +419,22 @@
     background: var(--cs-bg, #1a1a2e);
     border: 1px solid var(--cs-error, #f87171);
     border-radius: var(--cs-radius, 12px);
-    padding: 24px; text-align: center;
+    padding: 28px;                  /* ★ 24 → 28 */
+    text-align: center;
     font-family: var(--cs-font, 'Noto Sans KR', sans-serif);
     color: var(--cs-text, #e0e0e0);
 }
-.cs-alert-icon { font-size: 32px; margin-bottom: 12px; }
-.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 8px; }
-.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 18px; }
-.cs-alert-buttons { display: flex; gap: 10px; justify-content: center; }
+.cs-alert-icon { font-size: 32px; margin-bottom: 14px; /* ★ 12 → 14 */ }
+.cs-alert-title { font-size: 16px; font-weight: 700; color: var(--cs-error); margin-bottom: 10px; /* ★ 8 → 10 */ }
+.cs-alert-msg { font-size: 13px; color: var(--cs-text-sub); line-height: 1.6; margin-bottom: 20px; /* ★ 18 → 20 */ }
+.cs-alert-buttons { display: flex; gap: 12px; /* ★ 10 → 12 */ justify-content: center; }
 .cs-alert-ok {
-    padding: 8px 24px;
+    padding: 10px 28px;            /* ★ 8/24 → 10/28 */
     background: var(--cs-accent-gradient); color: #fff; border: none;
     border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--cs-font);
 }
 .cs-alert-summarize {
-    padding: 8px 24px;
+    padding: 10px 28px;            /* ★ 8/24 → 10/28 */
     background: var(--cs-btn-secondary-bg); color: var(--cs-btn-secondary-text);
     border: 1px solid var(--cs-btn-secondary-border);
     border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--cs-font);
@@ -512,7 +533,7 @@
 
 [data-theme="romance"] .cs-header {
     background: transparent; border-bottom: 1px solid rgba(200,160,60,0.3);
-    position: relative; z-index: 1; padding: 16px 16px 14px; text-align: center;
+    position: relative; z-index: 1; padding: 18px 16px 16px; /* ★ 16/16/14 → 18/16/16 */ text-align: center;
 }
 [data-theme="romance"] .cs-header::before {
     content: '♛'; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
@@ -530,11 +551,11 @@
     padding-top: 6px; text-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 [data-theme="romance"] .cs-close-btn {
-    position: absolute; right: 22px; top: 16px;
+    position: absolute; right: 22px; top: 18px; /* ★ 16 → 18 */
     background: rgba(200,160,60,0.1); border: 1px solid rgba(200,160,60,0.3); color: #c8a060; font-size: 12px; z-index: 1;
 }
 [data-theme="romance"] .cs-close-btn:hover { background: rgba(200,160,60,0.2); }
-[data-theme="romance"] .cs-content { z-index: 1; position: relative; }
+[data-theme="romance"] .cs-content { z-index: 1; position: relative; padding-top: 24px; /* ★ 장식선 아래 여백 */ }
 
 [data-theme="romance"] .cs-context-meter {
     border: 1px solid rgba(200,160,60,0.3); background: rgba(60,20,34,0.8); position: relative;
@@ -582,8 +603,14 @@
 
 /* ── 모바일 ──────────────────────────────────── */
 @media (max-width: 480px) {
-    .cs-popup { width: 96vw; height: 90vh; }
-    .cs-content { padding: 12px; }
+    .cs-overlay {
+        padding: 24px 0 16px;      /* ★ 모바일 상하 패딩 조정 */
+    }
+    .cs-popup {
+        width: 96vw;
+        max-height: calc(100vh - 48px); /* ★ 모바일도 최대높이 제한 */
+    }
+    .cs-content { padding: 14px; gap: 14px; }
     .cs-textarea { min-height: 150px; font-size: 11px; }
     [data-theme="retro"] .cs-header-title { font-size: 8px; }
 }
