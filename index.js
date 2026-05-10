@@ -115,26 +115,86 @@ function installFetchMonitor() {
                 const body = JSON.parse(options.body);
                 if (body.messages && Array.isArray(body.messages)) {
                     const ctx = SillyTavern.getContext();
-                    let systemTokens = 0;
-                    let chatMessages = [];
 
-                    for (const m of body.messages) {
-                        if (m.role === 'system') {
-                            systemTokens += ctx.getTokenCount(m.content || '');
+                    // ★ user/assistant 메시지 중 실제 채팅만 추출
+                    // 연속된 user↔assistant 교대 패턴을 찾아서 채팅 영역 판별
+                    let systemTokens = 0;
+                    let chatStartApiIdx = -1;
+                    let chatEndApiIdx = -1;
+
+                    // 뒤에서부터 탐색: 마지막 assistant 메시지 = 마지막 채팅
+                    for (let i = body.messages.length - 1; i >= 0; i--) {
+                        if (body.messages[i].role === 'assistant') {
+                            chatEndApiIdx = i;
+                            break;
+                        }
+                    }
+
+                    // 채팅 시작점 찾기: chatEndApiIdx에서 거슬러 올라가며
+                    // user↔assistant 교대가 끊기는 지점
+                    if (chatEndApiIdx > 0) {
+                        chatStartApiIdx = chatEndApiIdx;
+                        for (let i = chatEndApiIdx - 1; i >= 0; i--) {
+                            const curr = body.messages[i].role;
+                            const next = body.messages[i + 1].role;
+                            // user→assistant 또는 assistant→user 교대 패턴
+                            if ((curr === 'user' || curr === 'assistant') &&
+                                (curr !== next) &&
+                                (curr === 'user' || curr === 'assistant')) {
+                                chatStartApiIdx = i;
+                            } else if (curr === 'system') {
+                                // 시스템 메시지가 중간에 끼면 건너뛰기
+                                continue;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    // 시스템 토큰 = 전체 - 채팅 영역
+                    let chatApiTokens = 0;
+                    for (let i = 0; i < body.messages.length; i++) {
+                        const tokens = ctx.getTokenCount(body.messages[i].content || '');
+                        if (i >= chatStartApiIdx && i <= chatEndApiIdx &&
+                            (body.messages[i].role === 'user' || body.messages[i].role === 'assistant')) {
+                            chatApiTokens += tokens;
                         } else {
-                            chatMessages.push(m);
+                            systemTokens += tokens;
                         }
                     }
 
                     _csLastSystemTokens = systemTokens;
 
-                    const firstChatTokens = ctx.getTokenCount(chatMessages[0]?.content || '');
-                    let startIdx = 0;
-                    for (let i = 0; i < ctx.chat.length; i++) {
-                        const t = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-                        if (Math.abs(t - firstChatTokens) / Math.max(t, 1) < 0.15) {
-                            startIdx = i;
+                    // ★ ctx.chat 매칭: 첫 번째 API 채팅 메시지의 토큰으로 ctx.chat에서 찾기
+                    // 더 정확한 매칭: API 채팅의 첫 user 메시지 내용 앞부분과 ctx.chat 비교
+                    let firstApiChatMsg = null;
+                    for (let i = chatStartApiIdx; i <= chatEndApiIdx; i++) {
+                        if (body.messages[i].role === 'user' || body.messages[i].role === 'assistant') {
+                            firstApiChatMsg = body.messages[i];
                             break;
+                        }
+                    }
+
+                    let startIdx = 0;
+                    if (firstApiChatMsg) {
+                        const apiContent = (firstApiChatMsg.content || '').substring(0, 100);
+                        const apiTokens = ctx.getTokenCount(firstApiChatMsg.content || '');
+
+                        for (let i = 0; i < ctx.chat.length; i++) {
+                            const chatContent = (ctx.chat[i].mes || '').substring(0, 100);
+                            const chatTokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+
+                            // 내용 앞부분 비교 (더 정확)
+                            if (chatContent.length > 10 && apiContent.length > 10 &&
+                                chatContent.substring(0, 50) === apiContent.substring(0, 50)) {
+                                startIdx = i;
+                                break;
+                            }
+                            // 폴백: 토큰 수 비교
+                            if (Math.abs(chatTokens - apiTokens) / Math.max(chatTokens, 1) < 0.05) {
+                                startIdx = i;
+                                break;
+                            }
                         }
                     }
 
@@ -144,7 +204,7 @@ function installFetchMonitor() {
                         truncatedCount: startIdx
                     };
 
-                    console.log(`[CS Monitor] system=${systemTokens} tok, chat starts at msg[${startIdx}], truncated=${startIdx}`);
+                    console.log(`[CS Monitor] system=${systemTokens} tok, chatApi=${chatApiTokens} tok, chat starts at msg[${startIdx}], truncated=${startIdx}`);
                 }
             } catch (e) { /* ignore */ }
         }
@@ -154,6 +214,7 @@ function installFetchMonitor() {
 
     console.log('[Chat Summarizer] Fetch monitor installed');
 }
+
 
 // ===== 컨텍스트 계산 =====
 function getContextInfo() {
