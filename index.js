@@ -147,7 +147,7 @@ function getCsSettings() {
     return s;
 }
 
-// ===== Fetch 모니터 (실측 시스템 토큰) =====
+// ===== Fetch 모니터 (잘린 메시지 수 계산용) =====
 window._csLastSystemTokens = null;
 window._csLastChatRange = null;
 
@@ -243,77 +243,133 @@ function installFetchMonitor() {
     console.log('[Chat Summarizer] Fetch monitor installed');
 }
 
-// ===== 컨텍스트 계산 =====
+// ===== 컨텍스트 계산 (★ Prompt Itemization 우선) =====
 function getContextInfo() {
     const ctx = SillyTavern.getContext();
     const isOpenai = ctx.mainApi === 'openai';
-    const maxCtxEl = document.getElementById(isOpenai ? 'openai_max_context' : 'max_context');
-    const maxTokEl = document.getElementById(isOpenai ? 'openai_max_tokens' : 'max_tokens');
 
-    const maxContext = parseInt(maxCtxEl?.value) || ctx.maxContext || 8192;
-    const reservedResponse = parseInt(maxTokEl?.value) || 0;
+    // ★ 설정값: chatCompletionSettings 우선, DOM 폴백
+    const maxContext = isOpenai
+        ? (parseInt(ctx.chatCompletionSettings?.openai_max_context) || parseInt(document.getElementById('openai_max_context')?.value) || 8192)
+        : (parseInt(document.getElementById('max_context')?.value) || ctx.maxContext || 8192);
+    const reservedResponse = isOpenai
+        ? (parseInt(ctx.chatCompletionSettings?.openai_max_tokens) || parseInt(document.getElementById('openai_max_tokens')?.value) || 0)
+        : (parseInt(document.getElementById('max_tokens')?.value) || 0);
 
-    let allChatTokens = 0;
-    let summarizedTokens = 0;
-    let summarizedCount = 0;
+    // ★ 방법 1: Prompt Itemization DOM에서 정확한 값 읽기
+    let chatHistoryTokens = 0;
+    let totalPromptTokens = 0;
+    let itemizationFound = false;
 
-    for (const msg of ctx.chat) {
-        const tokens = msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
-        if (msg.extra?.cs_summarized) {
-            summarizedTokens += tokens;
-            summarizedCount++;
-        } else {
-            allChatTokens += tokens;
+    const spans = document.querySelectorAll('.prompt_manager_prompt_tokens');
+    if (spans.length > 0) {
+        spans.forEach(span => {
+            const val = parseInt(span.textContent) || 0;
+            totalPromptTokens += val;
+
+            const parent = span.closest('[data-pm-identifier], .completion_prompt_manager_prompt, .prompt_manager_prompt');
+            const nameEl = parent?.querySelector('.prompt_manager_prompt_name, .completion_prompt_manager_prompt_name');
+            const name = nameEl?.textContent?.trim() || '';
+
+            if (/chat.?history/i.test(name)) {
+                chatHistoryTokens = val;
+            }
+        });
+
+        if (chatHistoryTokens > 0) {
+            itemizationFound = true;
         }
     }
 
-    let systemTokens;
-    let truncatedCount;
-    let inContextTokens;
+    let systemTokens, available, inContextTokens, truncatedCount;
 
-    if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
-        systemTokens = window._csLastSystemTokens;
-        truncatedCount = window._csLastChatRange.truncatedCount;
-        inContextTokens = 0;
-        for (let i = window._csLastChatRange.startIdx; i < ctx.chat.length; i++) {
-            if (ctx.chat[i].extra?.cs_summarized) continue;
-            inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+    if (itemizationFound) {
+        // ★ 정확한 값 사용
+        systemTokens = totalPromptTokens - chatHistoryTokens;
+        available = maxContext - reservedResponse - systemTokens;
+        inContextTokens = chatHistoryTokens;
+
+        // 잘린 메시지 수: fetch 모니터 값 또는 추정
+        if (window._csLastChatRange?.startIdx > 0) {
+            truncatedCount = window._csLastChatRange.truncatedCount;
+        } else {
+            // 전체 채팅 토큰 vs 가용 토큰으로 추정
+            let allTokens = 0;
+            let tCount = 0;
+            for (let i = 0; i < ctx.chat.length; i++) {
+                if (ctx.chat[i].is_system || ctx.chat[i].extra?.cs_summarized) continue;
+                allTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+            }
+            if (allTokens > available) {
+                let sum = 0;
+                for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                    if (ctx.chat[i].is_system || ctx.chat[i].extra?.cs_summarized) continue;
+                    const t = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                    if (sum + t > available) { tCount = i + 1; break; }
+                    sum += t;
+                }
+            }
+            truncatedCount = tCount;
         }
     } else {
-        const wiBudgetEl = document.getElementById('world_info_budget');
-        const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
-        const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
-        const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
-
-        let wiBudgetTokens = 0;
-        if (wiBudgetPercent > 0) {
-            wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
-            if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) wiBudgetTokens = wiBudgetCap;
+        // ★ 폴백: 기존 추정 방식
+        let allChatTokens = 0;
+        for (const msg of ctx.chat) {
+            if (msg.extra?.cs_summarized) continue;
+            allChatTokens += msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
         }
 
-        systemTokens = wiBudgetTokens;
-        const available = maxContext - reservedResponse - wiBudgetTokens;
-
-        truncatedCount = 0;
-        inContextTokens = 0;
-        if (allChatTokens > available) {
-            let sum = 0;
-            for (let i = ctx.chat.length - 1; i >= 0; i--) {
+        if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
+            systemTokens = window._csLastSystemTokens;
+            truncatedCount = window._csLastChatRange.truncatedCount;
+            inContextTokens = 0;
+            for (let i = window._csLastChatRange.startIdx; i < ctx.chat.length; i++) {
                 if (ctx.chat[i].extra?.cs_summarized) continue;
-                const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-                if (sum + tokens > available) {
-                    truncatedCount = i + 1;
-                    break;
-                }
-                sum += tokens;
+                inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
             }
-            inContextTokens = sum;
         } else {
-            inContextTokens = allChatTokens;
+            const wiBudgetEl = document.getElementById('world_info_budget');
+            const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
+            const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
+            const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
+
+            let wiBudgetTokens = 0;
+            if (wiBudgetPercent > 0) {
+                wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
+                if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) wiBudgetTokens = wiBudgetCap;
+            }
+
+            systemTokens = wiBudgetTokens;
+            available = maxContext - reservedResponse - wiBudgetTokens;
+
+            truncatedCount = 0;
+            inContextTokens = 0;
+            if (allChatTokens > available) {
+                let sum = 0;
+                for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                    if (ctx.chat[i].extra?.cs_summarized) continue;
+                    const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                    if (sum + tokens > available) { truncatedCount = i + 1; break; }
+                    sum += tokens;
+                }
+                inContextTokens = sum;
+            } else {
+                inContextTokens = allChatTokens;
+            }
+        }
+
+        available = maxContext - reservedResponse - systemTokens;
+    }
+
+    // 요약된 메시지 통계
+    let summarizedTokens = 0, summarizedCount = 0;
+    for (const msg of ctx.chat) {
+        if (msg.extra?.cs_summarized) {
+            summarizedTokens += msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+            summarizedCount++;
         }
     }
 
-    const available = maxContext - reservedResponse - systemTokens;
     const usagePercent = available > 0 ? Math.round((inContextTokens / available) * 100) : 0;
 
     return {
@@ -322,13 +378,12 @@ function getContextInfo() {
         systemTokens,
         available,
         chatTokens: inContextTokens,
-        allChatTokens,
         summarizedTokens,
         summarizedCount,
         truncatedCount,
         usagePercent,
         chatLength: ctx.chat.length,
-        isEstimated: window._csLastSystemTokens === null
+        isEstimated: !itemizationFound
     };
 }
 
@@ -371,14 +426,12 @@ function parseSummaryResult(text) {
     const sections = { Main_Characters: '', Minor_Characters: '', Timeline: '', Locations: '', Lore: '' };
     const names = Object.keys(sections);
 
-    // ★ 더 유연한 매칭: 줄 시작에 공백 허용, 콜론 뒤 공백/줄바꿈 허용
     for (let i = 0; i < names.length; i++) {
         const name = names[i];
         const regex = new RegExp(`^\\s*${name}\\s*:`, 'im');
         const match = raw.search(regex);
         if (match === -1) continue;
 
-        // 다음 섹션 시작점 찾기
         let endIdx = raw.length;
         for (let j = i + 1; j < names.length; j++) {
             const nextRegex = new RegExp(`^\\s*${names[j]}\\s*:`, 'im');
@@ -390,12 +443,10 @@ function parseSummaryResult(text) {
         }
 
         const block = raw.substring(match, endIdx).trim();
-        // 헤더 줄 제거 (첫 줄)
         const firstNewline = block.indexOf('\n');
         if (firstNewline !== -1) {
             sections[name] = block.substring(firstNewline + 1).trim();
         } else {
-            // 콜론 뒤에 바로 내용이 있는 경우
             const colonIdx = block.indexOf(':');
             const afterColon = block.substring(colonIdx + 1).trim();
             sections[name] = afterColon;
@@ -476,13 +527,56 @@ function showContextWarning(info) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
+// ===== ★ 게이지 업데이트 함수 =====
+function updateMeter(meterEl, info) {
+    if (!meterEl) return;
+
+    const settings = getCsSettings();
+
+    // 미터 바 업데이트
+    const fill = meterEl.querySelector('.cs-meter-fill');
+    if (fill) {
+        fill.className = 'cs-meter-fill';
+        if (info.usagePercent >= 90) fill.classList.add('danger');
+        else if (info.usagePercent >= settings.warnThreshold) fill.classList.add('warning');
+        else fill.classList.add('safe');
+        fill.style.width = Math.min(info.usagePercent, 100) + '%';
+    }
+
+    // 값 업데이트
+    const valueEl = meterEl.querySelector('.cs-meter-value');
+    if (valueEl) valueEl.textContent = info.usagePercent + '%';
+
+    // 라벨 업데이트
+    const labelEl = meterEl.querySelector('.cs-meter-label');
+    if (labelEl) {
+        const badge = info.isEstimated ? ' <span class="cs-estimated-badge">(추정)</span>' : '';
+        labelEl.innerHTML = `컨텍스트 사용량${badge}`;
+    }
+
+    // 상세 수치 업데이트
+    const details = meterEl.querySelectorAll('.cs-meter-detail');
+    if (details[0]) {
+        details[0].innerHTML = `<span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span><span>가용: ${info.available.toLocaleString()} 토큰</span>`;
+    }
+    if (details[1]) {
+        details[1].innerHTML = `<span>🔧 시스템: ${info.systemTokens.toLocaleString()} 토큰${info.isEstimated ? ' (추정)' : ''}</span><span>전체: ${info.maxContext.toLocaleString()}</span>`;
+    }
+}
+
 // ===== 메인 팝업 =====
 function showSummarizerPopup() {
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
-        // ★ 이미 있으면 그냥 보여주기만 (결과 유지)
         existing.style.display = 'flex';
         existing.setAttribute('data-theme', getCsSettings().theme);
+
+        // ★ 게이지가 있으면 갱신 (결과는 유지)
+        const meter = existing.querySelector('.cs-context-meter');
+        if (meter) {
+            const info = getContextInfo();
+            updateMeter(meter, info);
+        }
         return;
     }
 
@@ -577,7 +671,6 @@ function showMainView(content, settings, profiles, info, overlay) {
                 <span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span>
                 <span>가용: ${info.available.toLocaleString()} 토큰</span>
             </div>
-            ${info.allChatTokens > info.chatTokens ? `<div class="cs-meter-detail" style="margin-top:4px;"><span>💬 전체 채팅: ${info.allChatTokens.toLocaleString()} 토큰</span><span>(잘린 부분 포함)</span></div>` : ''}
             <div class="cs-meter-detail" style="margin-top:4px;">
                 <span>🔧 시스템: ${info.systemTokens.toLocaleString()} 토큰${info.isEstimated ? ' (추정)' : ''}</span>
                 <span>전체: ${info.maxContext.toLocaleString()}</span>
@@ -656,8 +749,6 @@ async function generateSummary(content, settings, profiles, overlay) {
 
         if (settings.profileId) {
             const CMRS = ctx.ConnectionManagerRequestService;
-
-            // ★ 채팅 히스토리를 텍스트로 변환해서 프롬프트에 포함
             const chatHistory = buildChatHistoryText();
 
             const messages = [
@@ -668,7 +759,6 @@ async function generateSummary(content, settings, profiles, overlay) {
                 stream: true, signal: null, extractData: true, includePreset: false, includeInstruct: false,
             });
 
-            // ★ 스트리밍 응답 처리
             if (typeof response === 'function') {
                 const streamGen = response();
                 let lastText = '';
@@ -715,10 +805,14 @@ async function generateSummary(content, settings, profiles, overlay) {
 function showError(content, msg, settings, profiles, overlay) {
     content.innerHTML = `
         <div class="cs-error-msg">에러: ${escapeHtml(msg)}</div>
-        <button class="cs-retry-btn" id="cs-retry">↻ 돌아가기</button>`;
+        <div class="cs-bottom-actions">
+            <button class="cs-retry-btn" id="cs-retry">↻ 다시 시도</button>
+            <button class="cs-retry-btn" id="cs-error-reset" style="color:var(--cs-error);">✕ 초기화</button>
+        </div>`;
     content.querySelector('#cs-retry').addEventListener('click', () => {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
     });
+    content.querySelector('#cs-error-reset').addEventListener('click', () => overlay.remove());
 }
 
 // ===== 결과 =====
@@ -761,7 +855,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
 
     let rawFallbackHtml = '';
     if (allEmpty && parsed.raw.trim()) {
-        const rawLines = Math.max(5, parsed.raw.split('\n').length + 2);
+        const rawLines = Math.max(6, parsed.raw.split('\n').length + 2);
         rawFallbackHtml = `
             <div class="cs-result-section" data-section="raw">
                 <div class="cs-result-header">
@@ -810,11 +904,10 @@ function showResult(content, parsed, settings, profiles, overlay) {
         </div>
         <div class="cs-bottom-actions">
             <button class="cs-retry-btn" id="cs-regenerate">↻ 다시 생성</button>
-            <button class="cs-retry-btn" id="cs-back">← 돌아가기</button>
             <button class="cs-retry-btn" id="cs-reset" style="color:var(--cs-error);">✕ 초기화</button>
         </div>`;
 
-    // ★ 결과 섹션 헤더 클릭 → 토글
+    // 결과 섹션 헤더 클릭 → 토글
     content.querySelectorAll('.cs-result-header').forEach(header => {
         header.addEventListener('click', (e) => {
             if (e.target.classList.contains('cs-copy-btn')) return;
@@ -862,11 +955,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
         generateSummary(content, settings, profiles, overlay);
     });
 
-    content.querySelector('#cs-back').addEventListener('click', () => {
-        showMainView(content, settings, profiles, getContextInfo(), overlay);
-    });
-
-    // ★ 초기화 버튼만 DOM에서 완전 제거
+    // ★ 초기화 → 팝업 DOM 완전 제거
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
@@ -874,8 +963,12 @@ function showResult(content, parsed, settings, profiles, overlay) {
 function checkContextWarning() {
     const settings = getCsSettings();
     if (!settings.warnEnabled) return;
+    if (window._csWarningShown) return;
     const info = getContextInfo();
-    if (info.usagePercent >= settings.warnThreshold) showContextWarning(info);
+    if (info.usagePercent >= settings.warnThreshold) {
+        window._csWarningShown = true;
+        showContextWarning(info);
+    }
 }
 
 // ===== 설정 UI =====
