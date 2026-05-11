@@ -320,22 +320,35 @@ function parseSummaryResult(text) {
     const sections = { Main_Characters: '', Minor_Characters: '', Timeline: '', Locations: '', Lore: '' };
     const names = Object.keys(sections);
 
+    // ★ 더 유연한 매칭: 줄 시작에 공백 허용, 콜론 뒤 공백/줄바꿈 허용
     for (let i = 0; i < names.length; i++) {
         const name = names[i];
-        const regex = new RegExp(`^${name}[:\\s]*$`, 'im');
+        const regex = new RegExp(`^\\s*${name}\\s*:`, 'im');
         const match = raw.search(regex);
         if (match === -1) continue;
 
+        // 다음 섹션 시작점 찾기
         let endIdx = raw.length;
         for (let j = i + 1; j < names.length; j++) {
-            const nextRegex = new RegExp(`^${names[j]}[:\\s]*$`, 'im');
+            const nextRegex = new RegExp(`^\\s*${names[j]}\\s*:`, 'im');
             const nextMatch = raw.substring(match + name.length).search(nextRegex);
-            if (nextMatch !== -1) { endIdx = match + name.length + nextMatch; break; }
+            if (nextMatch !== -1) {
+                endIdx = match + name.length + nextMatch;
+                break;
+            }
         }
 
-        const content = raw.substring(match, endIdx).trim();
-        const headerEnd = content.indexOf('\n');
-        sections[name] = headerEnd !== -1 ? content.substring(headerEnd + 1).trim() : '';
+        const block = raw.substring(match, endIdx).trim();
+        // 헤더 줄 제거 (첫 줄)
+        const firstNewline = block.indexOf('\n');
+        if (firstNewline !== -1) {
+            sections[name] = block.substring(firstNewline + 1).trim();
+        } else {
+            // 콜론 뒤에 바로 내용이 있는 경우
+            const colonIdx = block.indexOf(':');
+            const afterColon = block.substring(colonIdx + 1).trim();
+            sections[name] = afterColon;
+        }
     }
 
     return { raw, sections };
