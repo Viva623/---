@@ -688,7 +688,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
         for (const [key, label] of Object.entries(sectionLabels)) {
             const text = parsed.sections[key] || '';
             const has = text.trim().length > 0;
-            const lines = Math.max(3, text.split('\n').length + 2);
+            const lines = Math.max(6, text.split('\n').length + 2);
 
             sectionsHtml += `
                 <div class="cs-result-section" data-section="${key}">
