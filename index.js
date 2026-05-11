@@ -15,14 +15,14 @@ const CS_DEFAULTS = Object.freeze({
     theme: 'dark',
 });
 
-const CS_DEFAULT_PROMPT = `[Pause the roleplay. You are the Game Master—an entity responsible for tracking all events, characters, and world details. Your task is to write a detailed report of the roleplay so far to keep the story focused and internally consistent. Deep-analyze today's entire chat history, world info, and character interactions, then produce a summary without continuing the roleplay. Output YAML only, wrapped in <summary></summary> tags.]
+const CS_DEFAULT_PROMPT = `[Pause the roleplay. You are the Game Master—an entity responsible for tracking all events, characters, and world details of today. Your task is to write a detailed report of the roleplay so far to keep the story focused and internally consistent. Deep-analyze today's entire chat history, world info, and character interactions, then produce a summary without continuing the roleplay. Output YAML only, wrapped in <summary></summary> tags.]
 
 Critical: Avoid Redundant Summarization
 Before writing, scan for any existing summary in <summary> tags or timeline data in the lorebook/world info.
 
 If a prior summary or lorebook timeline exists, identify the last recorded timestamp (the most recent event entry).
 Your new summary begins AFTER that timestamp. Do NOT re-summarize, restate, or duplicate anything already recorded.
-For the Timeline section specifically: start logging from the first event that occurs after the last recorded timestamp.
+For the Timeline section specifically: start logging from the first event that occurs after the last recorded timestamp. For example, if the lorebook records up to 2024-07-10 14:30, your Timeline starts at the next event (e.g., 14:35 or later).
 For Main Characters / Minor Characters / Locations / Lore: only add new entries or update existing entries with changes that occurred after the last recorded point. Do not rewrite unchanged information.
 If NO prior summary or lorebook timeline exists, summarize the full chat history from the beginning.
 
@@ -30,56 +30,107 @@ Timeline vs Lore Division Rule:
 
 Timeline records WHAT HAPPENED: actions, dialogue, events in sequence.
 - Include key dialogue lines verbatim (quoted).
-- For recurring systems/patterns, write a ONE-LINE contextual hint on first occurrence, then reference by name only on subsequent occurrences.
+- For recurring systems/patterns (e.g., Lap Law, Kiss Registry, Papa-Transfer), write a ONE-LINE contextual hint on first occurrence, then reference by name only on subsequent occurrences.
+  Example first occurrence: "Lap Law activated — whoever sits on your lap gets fed (Elizabeth's Philip-inherited rule)."
+  Example later: "Lap Law activated."
 
 Lore records WHAT SOMETHING IS: definitions, mechanics, accumulated patterns, symbolic meaning, character analysis.
 - When a new system/pattern/rule is established in a scene, create or update its Lore entry with full explanation.
-- When an existing system appears in a new scene, update the Lore entry ONLY if something changed.
+- When an existing system appears in a new scene, update the Lore entry ONLY if something changed (new rule added, new person enrolled, etc.).
 
-Neither section should fully duplicate the other. Timeline provides narrative context; Lore provides reference context.
+Neither section should fully duplicate the other. Timeline provides narrative context; Lore provides reference context. Together they reconstruct the full picture.
 
-NPC & Location Scope Rules:
+NPC & Location Scope Rules
 
 LOCATIONS — answer ONLY "What does this place look like?"
-- Physical description: architecture, layout, key rooms/objects, sensory details.
-- DO NOT include events, character emotions, or analysis.
-- Merge repeated entries into ONE entry.
+  - Physical description: architecture, layout, key rooms/objects, sensory details (scent, light, sound).
+  - Permanent fixtures and spatial relationships.
+  - DO NOT include:
+    • Events that happened there (→ Timeline).
+    • Character emotions or analysis (→ Lore or Timeline).
+    • Repeated/dated entries for the same location; merge into ONE entry and update only if the space physically changed.
+  - If a location appears only once and has no unique physical detail worth preserving, reduce to ONE line or omit.
 
 MINOR CHARACTERS (NPCs) — answer ONLY "Who is this person?"
-- Identity: name, age, affiliation/role, 1-2 physical identifiers.
-- Traits: bracketed list, max 3-5 items.
-- DO NOT include scene-by-scene actions (→ Timeline).
+  - Identity: name, age (if known), affiliation/role, 1-2 physical identifiers (hair, build, uniform, etc.).
+  - Traits: bracketed list, max 3-5 items.
+  - DO NOT include:
+    • Scene-by-scene actions or dated events (→ Timeline).
+    • Relationship dynamics or arc analysis (→ Lore).
+    • Information already fully covered in a Lore entry. Instead write: "(→ Lore: [entry name])" as a pointer.
+  - Frequency-based detail budget:
+    • Recurring NPC (3+ scenes): 2-4 lines.
+    • Supporting NPC (1-2 scenes): 1-2 lines.
+    • One-scene extra / atmosphere only: 1 line MAX, or omit entirely and let the Timeline carry the detail.
+  - Group similar NPCs when possible.
 
-MAIN CHARACTERS — follow the template below.
+MAIN CHARACTERS — follow the existing template below.
+  - Role field: WHO they are (1-2 sentences). Not what they did today — that belongs in Timeline.
+  - Items/Cloths: update only when new items acquired or lost.
+  - If a Main Character's arc, system, or pattern is complex, put the analysis in Lore and add a pointer: "(→ Lore: [entry name])".
 
-CROSS-REFERENCE RULE: Use "(→ Section: Entry)" pointers instead of restating information.
-MERGE / DEDUP RULE: Keep the LONGEST version in its primary section; replace copies with pointers.
+CROSS-REFERENCE RULE (applies to ALL sections):
+  When information belongs primarily in one section but is referenced in another, use a pointer instead of restating:
+    Timeline: "Lap Law activated (→ Lore: Lap Law)."
+    NPC: "Paul Ashworth — (→ Lore: Paul Ashworth Arc)."
+  This prevents the same paragraph from appearing in 3 places.
+
+MERGE / DEDUP RULE:
+  Before finalizing, scan all sections for content that appears in more than one place. Keep the LONGEST version in its primary section; replace all other copies with a "(→ Section: Entry)" pointer.
+  Primary ownership:
+    • Event/dialogue → Timeline
+    • Definition/rule/pattern → Lore
+    • Physical space → Location
+    • Identity/traits → Main or Minor Characters
 
 Your summary must include all of the following sections:
 
 Main_Characters:
-  - name: (Full Name)
-    appearance: (species, physical details)
-    role: (who they are in the story, 1-2 sentences)
-    traits: ["trait1", "trait2", "trait3"]
-    items: ["item1", "item2"]
-    cloths: ["clothing1", "clothing2"]
+A major character has directly interacted with the protagonist and is likely to reappear or develop further. List for each:
+- name: Character's full name.
+- appearance: Species and notable physical details.
+- role: Who they are in the story (one or two concise sentences).
+- traits: Comma-separated list of core personality traits (bracketed YAML array).
+- items: Comma-separated list of unique plot relevant possessions (bracketed YAML array).
+- cloths: Comma-separated list of owned clothing (bracketed YAML array).
+
+  - name: John Doe
+    appearance: human, short brown hair, green eyes, slender build
+    role: Owner of the city library. Methodical and keeps strict control of the lending system.
+    traits: ["Loyal", "Observant", "Keeps his word", "Reserved", "Occasionally clumsy"]
+    items: ["Well-worn leather satchel", "Sturdy pocket-knife", "old red car"]
+    cloths: ["Vintage clothing set", "red laced lingerie", "sweatpants"]
 
 Minor_Characters:
-##(Name): (Brief description—role, traits, appearance in 1-2 lines)
+Named figures who have appeared but do not yet drive the plot. List as key-value pairs, with each key prefixed by "##" (double hash):
+
+##Mike Wilson: The family butler—punctual, formal, and fiercely protective of household routines.
+##Ms. Brown: The perpetually curious neighbour who always checks on library gossip.
 
 Timeline:
-##(Date)
-###(Time)
-  - (Event description)
+Chronological log of significant events (concise bullet phrases). Include the date for each day and time of action:
+
+##2022-05-02
+###09:30
+  - He cleans all the floors.
+  - He chats with Ms. Brown about neighbourhood rumours.
+###17:50
+  - John returns home and takes a long shower.
+  - Mike Wilson confronts John about adopting a stricter schedule.
 
 Locations:
-##(Place Name): (Physical description in 1-2 lines)
+Important places visited or referenced, with each key prefixed by "##" (double hash):
+
+##John Residence: Single-story suburban house with two bedrooms, a cosy study, and a small garden.
+##Central Library: John Doe's workplace—an imposing stone building stocked with rare historical volumes.
 
 Lore:
-##(Entry Name): (Definition/explanation)
+World facts, rules, or organisations that matter, with each key prefixed by "##" (double hash):
 
-> If an earlier summary exists, append only new events and changed entries. Return the complete merged YAML inside <summary></summary> tags only—no commentary outside the tags.`;
+##Doe Family: A long lineage entrusted with managing the Central Library for generations.
+##Pneumatic Tubes: The city's primary method of long-distance message delivery.
+
+> If an earlier summary or lorebook timeline exists, identify its last timestamp, then ONLY append new events and update changed entries. Never duplicate existing data. Return the complete merged YAML summary only—do not add commentary outside the <summary></summary> block.`;
 
 // ===== 설정 =====
 function getCsSettings() {
