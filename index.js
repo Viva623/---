@@ -116,7 +116,6 @@ function installFetchMonitor() {
                 if (body.messages && Array.isArray(body.messages)) {
                     const ctx = SillyTavern.getContext();
 
-                    // ★ 1단계: API 메시지에서 채팅 영역 찾기 (역방향)
                     let chatEndApiIdx = -1;
                     let chatStartApiIdx = -1;
 
@@ -141,7 +140,6 @@ function installFetchMonitor() {
                         }
                     }
 
-                    // ★ 2단계: 시스템 토큰 계산
                     let systemTokens = 0;
                     let chatApiTokens = 0;
 
@@ -158,7 +156,6 @@ function installFetchMonitor() {
 
                     window._csLastSystemTokens = systemTokens;
 
-                    // ★ 3단계: API 채팅 메시지 개수로 ctx.chat 시작점 역산
                     let apiChatMsgCount = 0;
                     for (let i = chatStartApiIdx; i <= chatEndApiIdx; i++) {
                         const role = body.messages[i].role;
@@ -302,6 +299,19 @@ function buildSummaryPrompt(settings) {
     return prompt;
 }
 
+// ===== 채팅 히스토리 텍스트 변환 =====
+function buildChatHistoryText() {
+    const ctx = SillyTavern.getContext();
+    let history = '';
+    for (let i = 0; i < ctx.chat.length; i++) {
+        const msg = ctx.chat[i];
+        if (msg.is_system) continue;
+        const name = msg.is_user ? (ctx.name1 || 'User') : (ctx.name2 || 'Character');
+        history += `[${name}]: ${msg.mes}\n\n`;
+    }
+    return history;
+}
+
 // ===== 파싱 =====
 function parseSummaryResult(text) {
     const summaryMatch = text.match(/<summary>([\s\S]*?)<\/summary>/i);
@@ -406,6 +416,7 @@ function showContextWarning(info) {
 function showSummarizerPopup() {
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
+        // ★ 이미 있으면 그냥 보여주기만 (결과 유지)
         existing.style.display = 'flex';
         existing.setAttribute('data-theme', getCsSettings().theme);
         return;
@@ -581,9 +592,13 @@ async function generateSummary(content, settings, profiles, overlay) {
 
         if (settings.profileId) {
             const CMRS = ctx.ConnectionManagerRequestService;
+
+            // ★ 채팅 히스토리를 텍스트로 변환해서 프롬프트에 포함
+            const chatHistory = buildChatHistoryText();
+
             const messages = [
                 { role: 'system', content: 'You are a helpful assistant that summarizes roleplay chat logs into structured YAML format.' },
-                { role: 'user', content: prompt },
+                { role: 'user', content: `Here is the chat history to summarize:\n\n${chatHistory}\n\n---\n\n${prompt}` },
             ];
             const response = await CMRS.sendRequest(settings.profileId, messages, 16000, {
                 stream: true, signal: null, extractData: true, includePreset: false, includeInstruct: false,
@@ -735,6 +750,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
             <button class="cs-retry-btn" id="cs-reset" style="color:var(--cs-error);">✕ 초기화</button>
         </div>`;
 
+    // ★ 결과 섹션 헤더 클릭 → 토글
     content.querySelectorAll('.cs-result-header').forEach(header => {
         header.addEventListener('click', (e) => {
             if (e.target.classList.contains('cs-copy-btn')) return;
@@ -786,6 +802,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
         showMainView(content, settings, profiles, getContextInfo(), overlay);
     });
 
+    // ★ 초기화 버튼만 DOM에서 완전 제거
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
@@ -892,8 +909,6 @@ function addCsButton() {
     const ctx = SillyTavern.getContext();
     loadCsSettingsUI();
     setTimeout(addCsButton, 1500);
-
-    // ★ 모니터를 늦게 설치해서 다른 익스텐션 fetch 덮어쓰기 이후에 끼어들기
     setTimeout(installFetchMonitor, 3000);
 
     ctx.eventSource.on(ctx.eventTypes.CHARACTER_MESSAGE_RENDERED, () => {
