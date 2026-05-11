@@ -382,7 +382,7 @@
     background: var(--cs-card-bg);
     border: 1px solid var(--cs-border);
     border-radius: var(--cs-radius);
-    overflow: hidden;
+    overflow: visible;
 }
 .cs-result-header {
     display: flex; justify-content: space-between; align-items: center;
