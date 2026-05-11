@@ -407,12 +407,7 @@ function showSummarizerPopup() {
     const existing = document.querySelector('.cs-overlay');
     if (existing) {
         existing.style.display = 'flex';
-        const settings = getCsSettings();
-        const profiles = getAvailableProfiles();
-        const info = getContextInfo();
-        existing.setAttribute('data-theme', settings.theme);
-        const content = existing.querySelector('.cs-content');
-        if (content) showMainView(content, settings, profiles, info, existing);
+        existing.setAttribute('data-theme', getCsSettings().theme);
         return;
     }
 
@@ -678,7 +673,7 @@ function showResult(content, parsed, settings, profiles, overlay) {
                             <button class="cs-copy-btn" data-copy-section="${key}">복사</button>
                         </div>
                     </div>
-                    <div class="cs-result-body">
+                    <div class="cs-result-body open">
                         <textarea class="cs-result-textarea" data-section="${key}" rows="${lines}">${escapeHtml(text)}</textarea>
                     </div>
                 </div>`;
