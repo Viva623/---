@@ -678,6 +678,10 @@
 
 /* ── 모바일 ──────────────────────────────────── */
 @media (max-width: 480px) {
+    #cb-btn-wrapper {
+        order: -1;
+    }
+
     .cs-overlay {
         padding: 24px 0 16px;
     }
