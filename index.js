@@ -150,6 +150,7 @@ function getCsSettings() {
 // ===== Fetch 모니터 (잘린 메시지 수 계산용) =====
 window._csLastSystemTokens = null;
 window._csLastChatRange = null;
+window._csItemizationStale = false;
 
 function installFetchMonitor() {
     if (window._csMonitorInstalled) return;
@@ -232,6 +233,9 @@ function installFetchMonitor() {
                         truncatedCount: startIdx
                     };
 
+                    // ★ Itemization stale 해제
+                    window._csItemizationStale = false;
+
                     console.log(`[CS Monitor] system=${systemTokens}, chatApi=${chatApiTokens}, apiChatMsgs=${apiChatMsgCount}, ctxChat=${ctx.chat.length}, startIdx=${startIdx}, truncated=${startIdx}`);
                 }
             } catch (e) { /* ignore */ }
@@ -243,12 +247,11 @@ function installFetchMonitor() {
     console.log('[Chat Summarizer] Fetch monitor installed');
 }
 
-// ===== 컨텍스트 계산 (★ Prompt Itemization 우선) =====
+// ===== 컨텍스트 계산 (Prompt Itemization 우선) =====
 function getContextInfo() {
     const ctx = SillyTavern.getContext();
     const isOpenai = ctx.mainApi === 'openai';
 
-    // ★ 설정값: chatCompletionSettings 우선, DOM 폴백
     const maxContext = isOpenai
         ? (parseInt(ctx.chatCompletionSettings?.openai_max_context) || parseInt(document.getElementById('openai_max_context')?.value) || 8192)
         : (parseInt(document.getElementById('max_context')?.value) || ctx.maxContext || 8192);
@@ -276,7 +279,8 @@ function getContextInfo() {
             }
         });
 
-        if (chatHistoryTokens > 0) {
+        // ★ stale이 아니고 chatHistoryTokens가 있을 때만 신뢰
+        if (chatHistoryTokens > 0 && !window._csItemizationStale) {
             itemizationFound = true;
         }
     }
@@ -287,7 +291,7 @@ function getContextInfo() {
         systemTokens = totalPromptTokens - chatHistoryTokens;
         available = maxContext - reservedResponse - systemTokens;
 
-    // ★ 마커된 메시지 중 실제로 Chat History에 포함된 토큰 계산
+        // ★ 마커된 메시지 중 실제로 Chat History에 포함된 토큰 계산
         let summarizedInContext = 0;
         let tokenSum = 0;
         for (let i = ctx.chat.length - 1; i >= 0; i--) {
@@ -300,13 +304,12 @@ function getContextInfo() {
             }
         }
 
-    inContextTokens = chatHistoryTokens - summarizedInContext;
+        inContextTokens = chatHistoryTokens - summarizedInContext;
 
-        // 잘린 메시지 수: fetch 모니터 값 또는 추정
+        // 잘린 메시지 수
         if (window._csLastChatRange?.startIdx > 0) {
             truncatedCount = window._csLastChatRange.truncatedCount;
         } else {
-            // 전체 채팅 토큰 vs 가용 토큰으로 추정
             let allTokens = 0;
             let tCount = 0;
             for (let i = 0; i < ctx.chat.length; i++) {
@@ -540,13 +543,12 @@ function showContextWarning(info) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 }
 
-// ===== ★ 게이지 업데이트 함수 =====
+// ===== 게이지 업데이트 함수 =====
 function updateMeter(meterEl, info) {
     if (!meterEl) return;
 
     const settings = getCsSettings();
 
-    // 미터 바 업데이트
     const fill = meterEl.querySelector('.cs-meter-fill');
     if (fill) {
         fill.className = 'cs-meter-fill';
@@ -556,24 +558,34 @@ function updateMeter(meterEl, info) {
         fill.style.width = Math.min(info.usagePercent, 100) + '%';
     }
 
-    // 값 업데이트
     const valueEl = meterEl.querySelector('.cs-meter-value');
     if (valueEl) valueEl.textContent = info.usagePercent + '%';
 
-    // 라벨 업데이트
     const labelEl = meterEl.querySelector('.cs-meter-label');
     if (labelEl) {
         const badge = info.isEstimated ? ' <span class="cs-estimated-badge">(추정)</span>' : '';
         labelEl.innerHTML = `컨텍스트 사용량${badge}`;
     }
 
-    // 상세 수치 업데이트
     const details = meterEl.querySelectorAll('.cs-meter-detail');
     if (details[0]) {
         details[0].innerHTML = `<span>채팅: ${info.chatTokens.toLocaleString()} 토큰</span><span>가용: ${info.available.toLocaleString()} 토큰</span>`;
     }
     if (details[1]) {
         details[1].innerHTML = `<span>🔧 시스템: ${info.systemTokens.toLocaleString()} 토큰${info.isEstimated ? ' (추정)' : ''}</span><span>전체: ${info.maxContext.toLocaleString()}</span>`;
+    }
+
+    // 요약 정보 업데이트
+    let sumInfo = meterEl.querySelector('.cs-summarized-info');
+    if (info.summarizedCount > 0) {
+        if (!sumInfo) {
+            sumInfo = document.createElement('div');
+            sumInfo.className = 'cs-summarized-info';
+            meterEl.appendChild(sumInfo);
+        }
+        sumInfo.textContent = `✓ ${info.summarizedCount}개 메시지 요약 완료 (${info.summarizedTokens.toLocaleString()} 토큰 제외됨)`;
+    } else if (sumInfo) {
+        sumInfo.remove();
     }
 }
 
@@ -640,6 +652,7 @@ function showSummarizerPopup() {
 
 // ===== 메인 화면 =====
 function showMainView(content, settings, profiles, info, overlay) {
+    const ctx = SillyTavern.getContext();
     const fillClass = info.usagePercent >= 90 ? 'danger' : info.usagePercent >= 70 ? 'warning' : 'safe';
     const fillWidth = Math.min(info.usagePercent, 100);
 
@@ -671,6 +684,30 @@ function showMainView(content, settings, profiles, info, overlay) {
 
     const estimatedBadge = info.isEstimated ? ' <span class="cs-estimated-badge">(추정)</span>' : '';
 
+    // ★ 마커 섹션 (이미 요약된 메시지가 없을 때만 표시)
+    let defaultStart = 0;
+    for (let i = 0; i < ctx.chat.length; i++) {
+        if (ctx.chat[i].extra?.cs_summarized) defaultStart = i + 1;
+    }
+    const defaultEnd = Math.max(0, ctx.chat.length - 1);
+
+    let markerHtml = '';
+    if (info.summarizedCount === 0 && ctx.chat.length > 1) {
+        markerHtml = `
+        <div class="cs-range-section" style="margin-top:4px;">
+            <div class="cs-range-header">📌 이미 요약한 범위가 있다면 표시하세요</div>
+            <div class="cs-range-inputs">
+                <span class="cs-label">메시지</span>
+                <input type="number" class="cs-range-input" id="cs-pre-mark-start" value="0" min="0" max="${ctx.chat.length - 1}">
+                <span class="cs-range-sep">~</span>
+                <input type="number" class="cs-range-input" id="cs-pre-mark-end" value="${defaultEnd}" min="0" max="${ctx.chat.length - 1}">
+                <span class="cs-label">번</span>
+            </div>
+            <div class="cs-range-info">총 ${ctx.chat.length}개 메시지</div>
+            <button class="cs-mark-btn" id="cs-pre-mark-btn" style="margin-top:8px;">✓ 요약 완료로 표시</button>
+        </div>`;
+    }
+
     content.innerHTML = `
         <div class="cs-context-meter">
             <div class="cs-meter-header">
@@ -692,6 +729,7 @@ function showMainView(content, settings, profiles, info, overlay) {
             ${summarizedHtml}
         </div>
         ${warningHtml}
+        ${markerHtml}
         <div class="cs-profile-section">
             <label class="cs-label">연결 프로필</label>
             <select class="cs-select" id="cs-profile-select">${profileOpts}</select>
@@ -708,11 +746,13 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
+    // 프로필 선택
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
+    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
@@ -740,6 +780,30 @@ function showMainView(content, settings, profiles, info, overlay) {
         toastr.success('프롬프트가 기본값으로 초기화되었습니다.');
     });
 
+    // ★ 메인 화면 마커 버튼
+    const preMarkBtn = content.querySelector('#cs-pre-mark-btn');
+    if (preMarkBtn) {
+        preMarkBtn.addEventListener('click', async function () {
+            const startIdx = parseInt(content.querySelector('#cs-pre-mark-start').value) || 0;
+            const endIdx = parseInt(content.querySelector('#cs-pre-mark-end').value) || 0;
+            if (startIdx > endIdx) {
+                toastr.warning('시작 번호가 끝 번호보다 큽니다!');
+                return;
+            }
+            const count = await markAsSummarized(startIdx, endIdx);
+            this.textContent = `✓ ${count}개 메시지 표시 완료!`;
+            this.style.pointerEvents = 'none';
+            this.style.opacity = '0.6';
+
+            // 게이지 갱신
+            const newInfo = getContextInfo();
+            const meter = content.querySelector('.cs-context-meter');
+            if (meter) updateMeter(meter, newInfo);
+            toastr.success(`${count}개 메시지가 요약 완료로 표시되었습니다.`);
+        });
+    }
+
+    // 요약 생성
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -1083,6 +1147,16 @@ function addCsButton() {
 
     ctx.eventSource.on(ctx.eventTypes.CHARACTER_MESSAGE_RENDERED, () => {
         setTimeout(checkContextWarning, 500);
+    });
+
+    // ★ 챗방 전환 시 캐시 초기화
+    ctx.eventSource.on(ctx.eventTypes.CHAT_CHANGED, () => {
+        window._csLastSystemTokens = null;
+        window._csLastChatRange = null;
+        window._csWarningShown = false;
+        window._csItemizationStale = true;
+        document.querySelector('.cs-overlay')?.remove();
+        console.log('[Chat Summarizer] Chat changed, cache cleared');
     });
 
     console.log('[Chat Summarizer] Extension loaded!');
