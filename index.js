@@ -284,10 +284,23 @@ function getContextInfo() {
     let systemTokens, available, inContextTokens, truncatedCount;
 
     if (itemizationFound) {
-        // ★ 정확한 값 사용
         systemTokens = totalPromptTokens - chatHistoryTokens;
         available = maxContext - reservedResponse - systemTokens;
-        inContextTokens = chatHistoryTokens;
+
+    // ★ 마커된 메시지 중 실제로 Chat History에 포함된 토큰 계산
+        let summarizedInContext = 0;
+        let tokenSum = 0;
+        for (let i = ctx.chat.length - 1; i >= 0; i--) {
+            if (ctx.chat[i].is_system) continue;
+            const t = ctx.getTokenCount(ctx.chat[i].mes || '');
+            tokenSum += t;
+            if (tokenSum > chatHistoryTokens) break;
+            if (ctx.chat[i].extra?.cs_summarized) {
+                summarizedInContext += t;
+            }
+        }
+
+    inContextTokens = chatHistoryTokens - summarizedInContext;
 
         // 잘린 메시지 수: fetch 모니터 값 또는 추정
         if (window._csLastChatRange?.startIdx > 0) {
