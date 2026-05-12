@@ -147,6 +147,16 @@ function getCsSettings() {
     return s;
 }
 
+// ===== 챗방 ID 헬퍼 =====
+function getCurrentChatId() {
+    try {
+        const ctx = SillyTavern.getContext();
+        return ctx.characters?.[ctx.characterId]?.chat || 'default';
+    } catch (e) {
+        return 'default';
+    }
+}
+
 // ===== Fetch 모니터 (잘린 메시지 수 계산용) =====
 window._csLastSystemTokens = null;
 window._csLastChatRange = null;
@@ -247,7 +257,7 @@ function installFetchMonitor() {
     console.log('[Chat Summarizer] Fetch monitor installed');
 }
 
-// ===== 컨텍스트 계산 (Prompt Itemization 우선) =====
+// ===== 컨텍스트 계산 (Prompt Itemization 우선 → localStorage 폴백) =====
 function getContextInfo() {
     const ctx = SillyTavern.getContext();
     const isOpenai = ctx.mainApi === 'openai';
@@ -279,19 +289,26 @@ function getContextInfo() {
             }
         });
 
-        // ★ stale이 아니고 chatHistoryTokens가 있을 때만 신뢰
         if (chatHistoryTokens > 0 && !window._csItemizationStale) {
             itemizationFound = true;
+            // ★ localStorage에 저장
+            try {
+                const chatId = getCurrentChatId();
+                localStorage.setItem(`cs_system_tokens_${chatId}`, JSON.stringify({
+                    systemTokens: totalPromptTokens - chatHistoryTokens,
+                    chatHistoryTokens
+                }));
+            } catch (e) { /* ignore */ }
         }
     }
 
     let systemTokens, available, inContextTokens, truncatedCount;
 
     if (itemizationFound) {
+        // ★ Prompt Itemization 정확한 값
         systemTokens = totalPromptTokens - chatHistoryTokens;
         available = maxContext - reservedResponse - systemTokens;
 
-        // ★ 마커된 메시지 중 실제로 Chat History에 포함된 토큰 계산
         let summarizedInContext = 0;
         let tokenSum = 0;
         for (let i = ctx.chat.length - 1; i >= 0; i--) {
@@ -306,7 +323,6 @@ function getContextInfo() {
 
         inContextTokens = chatHistoryTokens - summarizedInContext;
 
-        // 잘린 메시지 수
         if (window._csLastChatRange?.startIdx > 0) {
             truncatedCount = window._csLastChatRange.truncatedCount;
         } else {
@@ -328,53 +344,88 @@ function getContextInfo() {
             truncatedCount = tCount;
         }
     } else {
-        // ★ 폴백: 기존 추정 방식
-        let allChatTokens = 0;
-        for (const msg of ctx.chat) {
-            if (msg.extra?.cs_summarized) continue;
-            allChatTokens += msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
-        }
+        // ★ 방법 2: localStorage에서 이전 값 복원
+        let restoredFromStorage = false;
+        try {
+            const chatId = getCurrentChatId();
+            const saved = JSON.parse(localStorage.getItem(`cs_system_tokens_${chatId}`));
+            if (saved && saved.systemTokens > 0) {
+                systemTokens = saved.systemTokens;
+                available = maxContext - reservedResponse - systemTokens;
 
-        if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
-            systemTokens = window._csLastSystemTokens;
-            truncatedCount = window._csLastChatRange.truncatedCount;
-            inContextTokens = 0;
-            for (let i = window._csLastChatRange.startIdx; i < ctx.chat.length; i++) {
-                if (ctx.chat[i].extra?.cs_summarized) continue;
-                inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-            }
-        } else {
-            const wiBudgetEl = document.getElementById('world_info_budget');
-            const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
-            const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
-            const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
-
-            let wiBudgetTokens = 0;
-            if (wiBudgetPercent > 0) {
-                wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
-                if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) wiBudgetTokens = wiBudgetCap;
-            }
-
-            systemTokens = wiBudgetTokens;
-            available = maxContext - reservedResponse - wiBudgetTokens;
-
-            truncatedCount = 0;
-            inContextTokens = 0;
-            if (allChatTokens > available) {
-                let sum = 0;
-                for (let i = ctx.chat.length - 1; i >= 0; i--) {
-                    if (ctx.chat[i].extra?.cs_summarized) continue;
-                    const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
-                    if (sum + tokens > available) { truncatedCount = i + 1; break; }
-                    sum += tokens;
+                let allChat = 0;
+                for (const msg of ctx.chat) {
+                    if (msg.is_system || msg.extra?.cs_summarized) continue;
+                    allChat += ctx.getTokenCount(msg.mes || '');
                 }
-                inContextTokens = sum;
-            } else {
-                inContextTokens = allChatTokens;
-            }
-        }
+                inContextTokens = Math.min(allChat, available);
 
-        available = maxContext - reservedResponse - systemTokens;
+                truncatedCount = 0;
+                if (allChat > available) {
+                    let sum = 0;
+                    for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                        if (ctx.chat[i].is_system || ctx.chat[i].extra?.cs_summarized) continue;
+                        const t = ctx.getTokenCount(ctx.chat[i].mes || '');
+                        if (sum + t > available) { truncatedCount = i + 1; break; }
+                        sum += t;
+                    }
+                    inContextTokens = available - (available - inContextTokens);
+                }
+
+                restoredFromStorage = true;
+                itemizationFound = true;
+            }
+        } catch (e) { /* ignore */ }
+
+        if (!restoredFromStorage) {
+            // ★ 방법 3: fetch 모니터 또는 WI 추정
+            let allChatTokens = 0;
+            for (const msg of ctx.chat) {
+                if (msg.extra?.cs_summarized) continue;
+                allChatTokens += msg.extra?.token_count || ctx.getTokenCount(msg.mes || '');
+            }
+
+            if (window._csLastSystemTokens !== null && window._csLastChatRange !== null) {
+                systemTokens = window._csLastSystemTokens;
+                truncatedCount = window._csLastChatRange.truncatedCount;
+                inContextTokens = 0;
+                for (let i = window._csLastChatRange.startIdx; i < ctx.chat.length; i++) {
+                    if (ctx.chat[i].extra?.cs_summarized) continue;
+                    inContextTokens += ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                }
+            } else {
+                const wiBudgetEl = document.getElementById('world_info_budget');
+                const wiBudgetCapEl = document.getElementById('world_info_budget_cap');
+                const wiBudgetPercent = parseInt(wiBudgetEl?.value) || 0;
+                const wiBudgetCap = parseInt(wiBudgetCapEl?.value) || 0;
+
+                let wiBudgetTokens = 0;
+                if (wiBudgetPercent > 0) {
+                    wiBudgetTokens = Math.floor(maxContext * (wiBudgetPercent / 100));
+                    if (wiBudgetCap > 0 && wiBudgetTokens > wiBudgetCap) wiBudgetTokens = wiBudgetCap;
+                }
+
+                systemTokens = wiBudgetTokens;
+                available = maxContext - reservedResponse - wiBudgetTokens;
+
+                truncatedCount = 0;
+                inContextTokens = 0;
+                if (allChatTokens > available) {
+                    let sum = 0;
+                    for (let i = ctx.chat.length - 1; i >= 0; i--) {
+                        if (ctx.chat[i].extra?.cs_summarized) continue;
+                        const tokens = ctx.chat[i].extra?.token_count || ctx.getTokenCount(ctx.chat[i].mes || '');
+                        if (sum + tokens > available) { truncatedCount = i + 1; break; }
+                        sum += tokens;
+                    }
+                    inContextTokens = sum;
+                } else {
+                    inContextTokens = allChatTokens;
+                }
+            }
+
+            available = maxContext - reservedResponse - systemTokens;
+        }
     }
 
     // 요약된 메시지 통계
@@ -575,7 +626,6 @@ function updateMeter(meterEl, info) {
         details[1].innerHTML = `<span>🔧 시스템: ${info.systemTokens.toLocaleString()} 토큰${info.isEstimated ? ' (추정)' : ''}</span><span>전체: ${info.maxContext.toLocaleString()}</span>`;
     }
 
-    // 요약 정보 업데이트
     let sumInfo = meterEl.querySelector('.cs-summarized-info');
     if (info.summarizedCount > 0) {
         if (!sumInfo) {
@@ -596,7 +646,6 @@ function showSummarizerPopup() {
         existing.style.display = 'flex';
         existing.setAttribute('data-theme', getCsSettings().theme);
 
-        // ★ 게이지가 있으면 갱신 (결과는 유지)
         const meter = existing.querySelector('.cs-context-meter');
         if (meter) {
             const info = getContextInfo();
@@ -795,7 +844,6 @@ function showMainView(content, settings, profiles, info, overlay) {
             this.style.pointerEvents = 'none';
             this.style.opacity = '0.6';
 
-            // 게이지 갱신
             const newInfo = getContextInfo();
             const meter = content.querySelector('.cs-context-meter');
             if (meter) updateMeter(meter, newInfo);
