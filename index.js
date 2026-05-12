@@ -243,7 +243,6 @@ function installFetchMonitor() {
                         truncatedCount: startIdx
                     };
 
-                    // ★ Itemization stale 해제
                     window._csItemizationStale = false;
 
                     console.log(`[CS Monitor] system=${systemTokens}, chatApi=${chatApiTokens}, apiChatMsgs=${apiChatMsgCount}, ctxChat=${ctx.chat.length}, startIdx=${startIdx}, truncated=${startIdx}`);
@@ -269,7 +268,6 @@ function getContextInfo() {
         ? (parseInt(ctx.chatCompletionSettings?.openai_max_tokens) || parseInt(document.getElementById('openai_max_tokens')?.value) || 0)
         : (parseInt(document.getElementById('max_tokens')?.value) || 0);
 
-    // ★ 방법 1: Prompt Itemization DOM에서 정확한 값 읽기
     let chatHistoryTokens = 0;
     let totalPromptTokens = 0;
     let itemizationFound = false;
@@ -291,7 +289,6 @@ function getContextInfo() {
 
         if (chatHistoryTokens > 0 && !window._csItemizationStale) {
             itemizationFound = true;
-            // ★ localStorage에 저장
             try {
                 const chatId = getCurrentChatId();
                 localStorage.setItem(`cs_system_tokens_${chatId}`, JSON.stringify({
@@ -305,7 +302,6 @@ function getContextInfo() {
     let systemTokens, available, inContextTokens, truncatedCount;
 
     if (itemizationFound) {
-        // ★ Prompt Itemization 정확한 값
         systemTokens = totalPromptTokens - chatHistoryTokens;
         available = maxContext - reservedResponse - systemTokens;
 
@@ -344,7 +340,6 @@ function getContextInfo() {
             truncatedCount = tCount;
         }
     } else {
-        // ★ 방법 2: localStorage에서 이전 값 복원
         let restoredFromStorage = false;
         try {
             const chatId = getCurrentChatId();
@@ -378,7 +373,6 @@ function getContextInfo() {
         } catch (e) { /* ignore */ }
 
         if (!restoredFromStorage) {
-            // ★ 방법 3: fetch 모니터 또는 WI 추정
             let allChatTokens = 0;
             for (const msg of ctx.chat) {
                 if (msg.extra?.cs_summarized) continue;
@@ -428,7 +422,6 @@ function getContextInfo() {
         }
     }
 
-    // 요약된 메시지 통계
     let summarizedTokens = 0, summarizedCount = 0;
     for (const msg of ctx.chat) {
         if (msg.extra?.cs_summarized) {
@@ -472,17 +465,33 @@ function buildSummaryPrompt(settings) {
     return prompt;
 }
 
-// ===== 채팅 히스토리 텍스트 변환 =====
-function buildChatHistoryText() {
+// ===== 채팅 히스토리 텍스트 변환 (★ maxTokens 지원) =====
+function buildChatHistoryText(maxTokens) {
     const ctx = SillyTavern.getContext();
-    let history = '';
+    let messages = [];
+
     for (let i = 0; i < ctx.chat.length; i++) {
         const msg = ctx.chat[i];
         if (msg.is_system) continue;
         const name = msg.is_user ? (ctx.name1 || 'User') : (ctx.name2 || 'Character');
-        history += `[${name}]: ${msg.mes}\n\n`;
+        messages.push(`[${name}]: ${msg.mes}`);
     }
-    return history;
+
+    // ★ maxTokens가 지정되면 최신 메시지부터 담아서 한도에 맞추기
+    if (maxTokens && maxTokens > 0) {
+        let history = '';
+        let tokenCount = 0;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const t = ctx.getTokenCount(messages[i]);
+            if (tokenCount + t > maxTokens) break;
+            tokenCount += t;
+            history = messages[i] + '\n\n' + history;
+        }
+        console.log(`[Chat Summarizer] Chat trimmed: ${tokenCount.toLocaleString()} tokens (budget: ${maxTokens.toLocaleString()})`);
+        return history.trim();
+    }
+
+    return messages.join('\n\n');
 }
 
 // ===== 파싱 =====
@@ -733,7 +742,6 @@ function showMainView(content, settings, profiles, info, overlay) {
 
     const estimatedBadge = info.isEstimated ? ' <span class="cs-estimated-badge">(추정)</span>' : '';
 
-    // ★ 마커 섹션 (이미 요약된 메시지가 없을 때만 표시)
     let defaultStart = 0;
     for (let i = 0; i < ctx.chat.length; i++) {
         if (ctx.chat[i].extra?.cs_summarized) defaultStart = i + 1;
@@ -795,13 +803,11 @@ function showMainView(content, settings, profiles, info, overlay) {
         </div>
         <button class="cs-generate-btn" id="cs-generate-btn">📝 요약 생성</button>`;
 
-    // 프로필 선택
     content.querySelector('#cs-profile-select').addEventListener('change', function () {
         settings.profileId = this.value;
         SillyTavern.getContext().saveSettingsDebounced();
     });
 
-    // 프롬프트 토글
     const toggleBtn = content.querySelector('#cs-prompt-toggle');
     const toggleIcon = content.querySelector('#cs-toggle-icon');
     const promptArea = content.querySelector('#cs-prompt-area');
@@ -829,7 +835,6 @@ function showMainView(content, settings, profiles, info, overlay) {
         toastr.success('프롬프트가 기본값으로 초기화되었습니다.');
     });
 
-    // ★ 메인 화면 마커 버튼
     const preMarkBtn = content.querySelector('#cs-pre-mark-btn');
     if (preMarkBtn) {
         preMarkBtn.addEventListener('click', async function () {
@@ -851,7 +856,6 @@ function showMainView(content, settings, profiles, info, overlay) {
         });
     }
 
-    // 요약 생성
     content.querySelector('#cs-generate-btn').addEventListener('click', () => {
         settings.profileId = content.querySelector('#cs-profile-select').value;
         SillyTavern.getContext().saveSettingsDebounced();
@@ -864,7 +868,7 @@ function showMainView(content, settings, profiles, info, overlay) {
     });
 }
 
-// ===== 요약 생성 =====
+// ===== 요약 생성 (★ 최대컨텍스트에 맞게 채팅 자르기) =====
 async function generateSummary(content, settings, profiles, overlay) {
     const ctx = SillyTavern.getContext();
     const prompt = buildSummaryPrompt(settings);
@@ -874,13 +878,30 @@ async function generateSummary(content, settings, profiles, overlay) {
 
         if (settings.profileId) {
             const CMRS = ctx.ConnectionManagerRequestService;
-            const chatHistory = buildChatHistoryText();
+
+            // ★ 사용자의 최대컨텍스트 설정에 맞게 채팅 히스토리 자르기
+            const isOpenai = ctx.mainApi === 'openai';
+            const maxCtx = isOpenai
+                ? (parseInt(ctx.chatCompletionSettings?.openai_max_context) || 128000)
+                : (parseInt(document.getElementById('max_context')?.value) || ctx.maxContext || 128000);
+            const maxResponseTokens = isOpenai
+                ? (parseInt(ctx.chatCompletionSettings?.openai_max_tokens) || 4000)
+                : (parseInt(document.getElementById('max_tokens')?.value) || 4000);
+
+            const promptTokens = ctx.getTokenCount(prompt);
+            const systemMsgTokens = ctx.getTokenCount('You are a helpful assistant that summarizes roleplay chat logs into structured YAML format.');
+            const overhead = promptTokens + systemMsgTokens + maxResponseTokens + 500; // 500 = 안전 마진
+            const chatBudget = Math.max(0, maxCtx - overhead);
+
+            console.log(`[Chat Summarizer] maxCtx=${maxCtx}, response=${maxResponseTokens}, prompt=${promptTokens}, overhead=${overhead}, chatBudget=${chatBudget}`);
+
+            const chatHistory = buildChatHistoryText(chatBudget);
 
             const messages = [
                 { role: 'system', content: 'You are a helpful assistant that summarizes roleplay chat logs into structured YAML format.' },
                 { role: 'user', content: `Here is the chat history to summarize:\n\n${chatHistory}\n\n---\n\n${prompt}` },
             ];
-            const response = await CMRS.sendRequest(settings.profileId, messages, 16000, {
+            const response = await CMRS.sendRequest(settings.profileId, messages, maxResponseTokens, {
                 stream: true, signal: null, extractData: true, includePreset: false, includeInstruct: false,
             });
 
@@ -1032,7 +1053,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
             <button class="cs-retry-btn" id="cs-reset" style="color:var(--cs-error);">✕ 초기화</button>
         </div>`;
 
-    // 결과 섹션 헤더 클릭 → 토글
     content.querySelectorAll('.cs-result-header').forEach(header => {
         header.addEventListener('click', (e) => {
             if (e.target.classList.contains('cs-copy-btn')) return;
@@ -1080,7 +1100,6 @@ function showResult(content, parsed, settings, profiles, overlay) {
         generateSummary(content, settings, profiles, overlay);
     });
 
-    // ★ 초기화 → 팝업 DOM 완전 제거
     content.querySelector('#cs-reset').addEventListener('click', () => overlay.remove());
 }
 
@@ -1197,7 +1216,6 @@ function addCsButton() {
         setTimeout(checkContextWarning, 500);
     });
 
-    // ★ 챗방 전환 시 캐시 초기화
     ctx.eventSource.on(ctx.eventTypes.CHAT_CHANGED, () => {
         window._csLastSystemTokens = null;
         window._csLastChatRange = null;
