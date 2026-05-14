@@ -13,6 +13,7 @@ const CS_DEFAULTS = Object.freeze({
     warnThreshold: 75,
     promptTemplate: '',
     theme: 'dark',
+    alwaysShowMarker: false, // 추가: 마커 항상 표시 여부 (기본: 숨김)
 });
 
 const CS_DEFAULT_PROMPT = `[Pause the roleplay. You are the Game Master—an entity responsible for tracking all events, characters, and world details of today. Your task is to write a detailed report of the roleplay so far to keep the story focused and internally consistent. Deep-analyze today's entire chat history, world info, and character interactions, then produce a summary without continuing the roleplay. Output YAML only, wrapped in <summary></summary> tags.]
@@ -748,8 +749,11 @@ function showMainView(content, settings, profiles, info, overlay) {
     }
     const defaultEnd = Math.max(0, ctx.chat.length - 1);
 
+
+
+    // showMainView 함수 안
     let markerHtml = '';
-    if (info.summarizedCount === 0 && ctx.chat.length > 1) {
+    if (ctx.chat.length > 1) { // 항상 표시
         markerHtml = `
         <div class="cs-range-section" style="margin-top:4px;">
             <div class="cs-range-header">📌 이미 요약한 범위가 있다면 표시하세요</div>
@@ -1143,6 +1147,10 @@ function loadCsSettingsUI() {
                 <div class="cb-setting-row">
                     <label for="cs_warn_threshold">경고 기준 (%)</label>
                     <input id="cs_warn_threshold" type="number" class="text_pole" min="50" max="100" value="${settings.warnThreshold}" style="width:80px;" />
+                </div>
+                <div class="cb-setting-row">
+                    <label for="cs_always_show_marker">마커 항상 표시</label>
+                    <input id="cs_always_show_marker" type="checkbox" ${settings.alwaysShowMarker ? 'checked' : ''} />
                 </div>
                 <small style="color:#888;display:block;margin-top:6px;">
                     채팅 토큰이 가용 컨텍스트의 해당 %를 넘으면 경고가 뜹니다.
